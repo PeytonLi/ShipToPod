@@ -12,6 +12,9 @@ import {
   GraduationCap,
   ArrowRight,
   ArrowDown,
+  Globe,
+  ScrollText,
+  Plus,
 } from "lucide-react";
 
 interface FlowNode {
@@ -27,8 +30,8 @@ interface FlowNode {
 const NODES: FlowNode[] = [
   {
     step: 1,
-    label: "Benchmark Tasks",
-    desc: "Pull real coding problems with hidden tests",
+    label: "Task Pool",
+    desc: "Benchmark problems + real-world scraped tasks",
     icon: BookOpen,
     color: "text-blue-400",
     iconBg: "bg-blue-500/10 border-blue-500/20",
@@ -122,7 +125,10 @@ function FlowNodeCard({
   return (
     <div
       className="group relative animate-reveal"
-      style={{ animationDelay: `${index * 0.08}s`, animationFillMode: "backwards" }}
+      style={{
+        animationDelay: `${index * 0.08}s`,
+        animationFillMode: "backwards",
+      }}
     >
       <div
         className={`relative rounded-xl border ${node.border} bg-[#0a0b0e] p-4 transition-all duration-200 hover:border-white/[0.15] hover:bg-[#0d0e12]`}
@@ -143,9 +149,7 @@ function FlowNodeCard({
         </div>
 
         {/* Description */}
-        <p className="text-[11px] leading-relaxed text-zinc-500">
-          {node.desc}
-        </p>
+        <p className="text-[11px] leading-relaxed text-zinc-500">{node.desc}</p>
       </div>
 
       {/* Right arrow (between columns) */}
@@ -171,6 +175,58 @@ export default function FlowGraph() {
 
   return (
     <div className="relative">
+      {/* ── Data sources banner ──────────────────────────── */}
+      <div className="mb-6 rounded-xl border border-white/[0.06] bg-[#0a0b0e] p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-600">
+            Where the tasks come from
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* Benchmarks */}
+          <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-500/[0.04] p-3">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10">
+              <ScrollText className="size-3 text-blue-400" />
+            </span>
+            <div>
+              <span className="text-xs font-medium text-white">
+                Standard Benchmarks
+              </span>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                Curated problem sets like MBPP, HumanEval, Spider, and WikiSQL.
+                Each task ships with hidden tests.
+              </p>
+            </div>
+          </div>
+
+          {/* Bright Data */}
+          <div className="flex items-start gap-3 rounded-lg border border-orange-500/20 bg-orange-500/[0.04] p-3">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-orange-500/20 bg-orange-500/10">
+              <Globe className="size-3 text-orange-400" />
+            </span>
+            <div>
+              <span className="text-xs font-medium text-white">
+                Bright Data Scraping
+              </span>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                Scrapes real-world coding problems from Stack Overflow,
+                competitive-programming sites, and open-source issue trackers.
+                Each scraped problem is converted into a testable task.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Merging arrow */}
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <Plus className="size-3 text-zinc-600" />
+          <span className="text-[10px] text-zinc-600">
+            Both sources feed into the same pipeline
+          </span>
+          <ArrowDown className="size-3 text-zinc-600" />
+        </div>
+      </div>
+
       {/* ── Grid layout ────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {NODES.map((node, i) => {

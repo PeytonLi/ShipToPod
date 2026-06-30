@@ -20,6 +20,7 @@ import {
   Target,
   Repeat,
   GraduationCap,
+  Globe,
 } from "lucide-react";
 import FlowGraph from "@/components/architecture/flow-graph";
 
@@ -28,7 +29,7 @@ const STEPS = [
   {
     num: 1,
     title: "Pick a coding challenge",
-    desc: 'We pull real programming problems from well-known benchmark collections. These are tasks like "write a function that sorts a list" or "query the database for active users." Each one comes with hidden tests that check if the solution actually works.',
+    desc: "We pull real programming problems from two sources. First, standard benchmark collections like MBPP and HumanEval — curated problem sets with hidden tests. Second, Bright Data scrapes real-world coding challenges from Stack Overflow, competitive-programming sites, and open-source issue trackers. Each scraped problem is automatically converted into a testable task. Both streams feed the same pipeline.",
     icon: BookOpen,
     color: "text-blue-400",
     bg: "border-blue-500/20 bg-blue-500/5",
@@ -111,6 +112,14 @@ const STEPS = [
 // ── Component parts explained in plain language ────────────────
 const COMPONENTS = [
   {
+    title: "Task Sources",
+    subtitle: "Benchmarks + Bright Data scraping",
+    desc: "Coding tasks come from two places. Standard benchmarks (MBPP, HumanEval, Spider, WikiSQL) provide curated, proven problems. Bright Data scrapes fresh real-world challenges from Stack Overflow, competitive-programming sites, and open-source issue trackers — automatically converting each into a testable CodeTask so the pipeline never runs dry.",
+    icon: Globe,
+    color: "border-orange-500/20 text-orange-300",
+    iconBg: "bg-orange-500/10",
+  },
+  {
     title: "The Student",
     subtitle: "Small DeepSeek-Coder model (~1.3B parameters)",
     desc: "This is the model we're trying to improve. It's small and fast — cheap enough to run thousands of times. Think of it as a junior developer: it knows the basics but makes mistakes on trickier problems. Every mistake is a learning opportunity.",
@@ -169,6 +178,7 @@ const TECH_STACK = [
   { label: "Training method", value: "QLoRA (r=16, α=32)" },
   { label: "Database", value: "MongoDB Atlas" },
   { label: "Model hosting", value: "Hugging Face" },
+  { label: "Task sourcing", value: "Bright Data + benchmarks" },
   { label: "Deployment", value: "Render" },
 ];
 

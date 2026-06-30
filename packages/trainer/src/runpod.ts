@@ -178,9 +178,22 @@ function selectGpuId(gpuType?: string): string {
 
 // ---- Pod lifecycle ----
 
-export function provisionPod(opts: RunPodProvisionOpts): { podId: string } {
-  const gpuId = opts.gpuType ?? selectGpuId();
-  const cloudType = opts.cloudType ?? "COMMUNITY";
+// GPUs that comfortably fit a 1.3B LoRA, tried in order when capacity is short.
+const GPU_FALLBACKS = [
+  "NVIDIA L40",
+  "NVIDIA L40S",
+  "NVIDIA A40",
+  "NVIDIA RTX A5000",
+  "NVIDIA RTX A6000",
+  "NVIDIA A100 80GB PCIe",
+  "NVIDIA GeForce RTX 4090",
+];
+
+function createPodOnce(
+  opts: RunPodProvisionOpts,
+  gpuId: string,
+  cloudType: string,
+): { podId: string } {
   const args = [
     "pod",
     "create",
@@ -216,6 +229,40 @@ export function provisionPod(opts: RunPodProvisionOpts): { podId: string } {
     if (byName) return { podId: byName.id };
     throw new Error("Cannot find pod: " + opts.name);
   }
+}
+
+export function provisionPod(opts: RunPodProvisionOpts): { podId: string } {
+  // SECURE cloud gives a routable public IP by default, which the SSH/scp
+  // training path needs; COMMUNITY public IPs are scarce. Default to SECURE.
+  const cloudType =
+    opts.cloudType ?? process.env.BBB_RUNPOD_CLOUD_TYPE ?? "SECURE";
+  const requested = opts.gpuType ?? selectGpuId();
+  const candidates = [
+    requested,
+    ...GPU_FALLBACKS.filter((g) => g !== requested),
+  ];
+  let lastError: unknown;
+  for (const gpuId of candidates) {
+    try {
+      return createPodOnce(opts, gpuId, cloudType);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Only fall through on capacity errors; surface real failures immediately.
+      if (/no longer any instances|no instances available|capacity/i.test(msg)) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(
+    "No GPU capacity on any candidate (" +
+      candidates.join(", ") +
+      ") on " +
+      cloudType +
+      ". Last error: " +
+      (lastError instanceof Error ? lastError.message : String(lastError)),
+  );
 }
 
 export function listPods(): RunPodDetails[] {

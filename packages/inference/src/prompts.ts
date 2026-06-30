@@ -7,29 +7,52 @@
 /* Challenger — invents adversarial code tasks from benchmarks          */
 /* ------------------------------------------------------------------ */
 
-export const CHALLENGER_SYSTEM = `You are an adversarial code-task designer. Given seed problems from real
-benchmarks (MBPP, HumanEval for Python; Spider, WikiSQL for SQL), mutate them
-into harder variants that expose blind spots in a small code model.
+export const CHALLENGER_SYSTEM = `You are an adversarial SQL task designer. Your job is to create coding problems
+that reliably BREAK a small, undertrained code model — and are only solved correctly
+by a strong expert model.
 
-For each task, produce a self-contained coding problem with:
-- A clear prompt the model must implement
-- Hidden tests that verify correctness (runnable by pytest for Python, SQLite for SQL)
-- An optional fixture (setup code, schema, seed data)
+Every task you design must exploit a specific failure mode that weak models exhibit:
+
+SQL FAILURE MODES TO TARGET:
+- Missing GROUP BY on aggregate queries (returns wrong rows)
+- Forgetting to handle NULLs in JOINs / WHERE clauses
+- Incorrect JOIN type (INNER vs LEFT when rows may be missing)
+- Correlated subquery instead of JOIN (exponential blowup or wrong results)
+- Missing HAVING when filtering on aggregates (puts condition in WHERE)
+- Reversed ORDER BY direction (ASC vs DESC confusion)
+- Off-by-one in LIMIT or forgetting LIMIT entirely
+- Double-counting with COUNT(*) when COUNT(DISTINCT) is needed
+- Incorrect self-join conditions (missing the distinct-alias check)
+- Forgetting parentheses around OR conditions mixed with AND
+- Using = with NULL (should be IS NULL / IS NOT NULL)
+- Window function without PARTITION BY when per-group ranking is needed
+- Recursive CTE missing the base case or termination condition
+
+For each task you create:
+1. Start from a real benchmark-style seed problem
+2. Add a TWIST that triggers one of the failure modes above
+3. Add a SECOND edge case that tests a different aspect
+4. Include at least 4 hidden tests — at least 2 of which a naive model WILL fail
+5. Every test must be deterministic (no RANDOM, no CURRENT_TIMESTAMP)
 
 Respond with EXACTLY this JSON (no markdown, no code fences):
 {
   "id": "<short kebab-case id>",
   "prompt": "<the coding task, self-contained>",
-  "language": "<python|sql>",
-  "hidden_tests": "<runnable test code>",
-  "fixture": "<optional setup code, or empty string>",
-  "source": "<mbpp|humaneval|spider|wikisql|mutated>"
+  "language": "sql",
+  "hidden_tests": "<runnable test code with -- TEST: names and -- EXPECTED: JSON arrays>",
+  "fixture": "<CREATE TABLE + INSERT statements>",
+  "source": "mutated"
 }
 
-Rules:
-- Tests must be deterministic (no random, no network, no filesystem beyond tempdir).
-- Favor problems where a naive implementation fails but a correct one passes.
-- Use edge cases: empty input, boundary values, complex nesting, etc.`;
+The hidden_tests MUST use this exact format:
+-- TEST: <descriptive_name>
+<SQL query that runs against the fixture>
+-- EXPECTED: <JSON array of expected row objects>
+
+Make the prompt deliberately tricky — omit hints, use slightly ambiguous phrasing,
+and don't spell out edge cases. The student model should struggle; the teacher
+should be the only one who catches the traps.`;
 
 /* ------------------------------------------------------------------ */
 /* Student solver (per-language)                                        */
@@ -97,21 +120,22 @@ set focus_language when one language dominates the failures.`;
 /* Intent Expander                                                      */
 /* ------------------------------------------------------------------ */
 
-export const INTENT_EXPANDER_SYSTEM = `You translate a user's plain-language goal for a fine-tuned BACKEND CODE model
-into a generation plan for an adversarial code curriculum. This product ONLY trains
-SQL and Python backend skills — map any goal onto backend coding tasks.
+export const INTENT_EXPANDER_SYSTEM = `You translate a user's plain-language goal into a generation plan for an
+adversarial SQL and Python code curriculum. This product trains backend coding
+skills — map ANY goal onto concrete SQL or Python coding topics.
 
 Respond with EXACTLY this JSON (no markdown, no code fences):
 {
-  "domain_framing": "<1-3 sentences telling the challenger what coding domain to target>",
-  "challenger_weights": { "<language-or-topic>": <relative weight 1..5> },
+  "domain_framing": "<1-3 sentences telling the challenger what coding domain to target, e.g. 'Focus on SQL queries involving multi-table JOINs, subqueries, and aggregation with HAVING. Include Python tasks on list manipulation and recursion.'>",
+  "challenger_weights": { "<topic>": <relative weight 1..5> },
   "focus_language": "<python|sql|null>",
   "sample_titles": ["<short example task title>", "..."]
 }
 
 Rules:
-- 3-6 challenger_weights, each a concrete topic (e.g. "python-list-comprehension",
-  "sql-joins", "python-recursion", "sql-aggregation").
-- Weights > 1 mean "prefer"; the loop samples toward them.
-- sample_titles: 2-3 plausible task titles.
-- If the goal is not backend-shaped, still pick the closest backend topics.`;
+- 3-6 challenger_weights using concrete backend topics like:
+  "sql-joins", "sql-subqueries", "sql-aggregation", "sql-window-functions",
+  "sql-cte", "python-list-comp", "python-recursion", "python-dict-manipulation"
+- Weights > 1 mean "prefer"; higher = more samples from that topic.
+- sample_titles: 2-3 plausible task titles showing what will be generated.
+- domain_framing MUST be non-empty — always give the challenger direction.`;

@@ -471,7 +471,7 @@ export function ControlCenter() {
         <div className="flex gap-2">
           <input
             className="h-9 flex-1 rounded-md border border-white/10 bg-black px-3 text-sm text-white outline-none focus:border-emerald-300 placeholder:text-zinc-600"
-            placeholder="e.g. a model good at responsive React layouts"
+            placeholder="e.g. good at SQL joins and subqueries"
             value={intent}
             onChange={(e) => setIntent(e.target.value)}
             aria-label="Model intent"
@@ -486,9 +486,9 @@ export function ControlCenter() {
         {snapshot.derivedConfig ? (
           <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs text-zinc-300">
             <div>
-              <span className="text-zinc-500">Framework:</span>{" "}
+              <span className="text-zinc-500">Focus:</span>{" "}
               <span className="text-white">
-                {snapshot.derivedConfig.framework ?? "—"}
+                {snapshot.derivedConfig.focus_language ?? "—"}
               </span>
             </div>
             <div className="mt-1">

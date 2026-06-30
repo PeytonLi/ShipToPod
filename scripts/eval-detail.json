@@ -1,0 +1,82 @@
+[
+  {
+    "prompt": "Write a SELECT query to find all pairs of customers who live in the same city. Return city, name1, a",
+    "expected": "[{\"city\":\"Chicago\",\"name1\":\"Carol White\",\"name2\":\"Frank Wilson\"},{\"city\":\"Los Angeles\",\"name1\":\"Bob Smith\",\"name2\":\"Eve Davis\"},{\"city\":\"Los Angeles\",",
+    "basePass": true,
+    "baseSql": "SELECT c1.city, c1.name AS name1, c2.name AS name2 FROM customers c1 JOIN customers c2 ON c1.city = c2.city AND c1.id < c2.id ORDER BY c1.city, name1;",
+    "tunedPass": true,
+    "tunedSql": "SELECT c1.city, c1.name AS name1, c2.name AS name2 FROM customers c1 JOIN customers c2 ON c1.city = c2.city AND c1.id < c2.id ORDER BY c1.city, name1;"
+  },
+  {
+    "prompt": "Write a SELECT query using two CTEs: first compute the total quantity sold per product (cte_sales), ",
+    "expected": "[{\"product_name\":\"Notebook\",\"quantity_sold\":15,\"avg_across_all\":4.625},{\"product_name\":\"Mouse\",\"quantity_sold\":6,\"avg_across_all\":4.625},{\"product_nam",
+    "basePass": true,
+    "baseSql": "WITH cte_sales AS ( SELECT product_id, SUM(quantity) AS quantity_sold FROM order_items GROUP BY product_id ), cte_avg AS ( SELECT AVG(quantity_sold) AS avg_acro",
+    "tunedPass": true,
+    "tunedSql": "WITH cte_sales AS ( SELECT product_id, SUM(quantity) AS quantity_sold FROM order_items GROUP BY product_id ), cte_avg AS ( SELECT AVG(quantity_sold) AS avg_acro"
+  },
+  {
+    "prompt": "Write a SELECT query to find the most expensive book. Return title and price.",
+    "expected": "[{\"title\":\"The Lord of the Rings\",\"price\":20}]",
+    "basePass": true,
+    "baseSql": "SELECT title, price FROM books ORDER BY price DESC LIMIT 1;",
+    "tunedPass": true,
+    "tunedSql": "SELECT title, price FROM books ORDER BY price DESC LIMIT 1;"
+  },
+  {
+    "prompt": "Write a SELECT query using IN to find students who are enrolled in courses taught by Dr. Adams. Retu",
+    "expected": "[{\"student_name\":\"Alice Johnson\"},{\"student_name\":\"Carol White\"},{\"student_name\":\"Frank Wilson\"}]",
+    "basePass": false,
+    "baseSql": "SELECT s.name FROM students s INNER JOIN enrollments e ON s.id = e.student_id INNER JOIN courses c ON e.course_id = c.id INNER JOIN professors p ON c.professor_",
+    "tunedPass": false,
+    "tunedSql": "SELECT s.name FROM students s INNER JOIN enrollments e ON s.id = e.student_id INNER JOIN courses c ON c.id = e.course_id INNER JOIN professors p ON p.id = c.pro"
+  },
+  {
+    "prompt": "Write a SELECT query using LAG() to show each customer's orders with the date of their previous orde",
+    "expected": "[{\"customer_name\":\"Alice Johnson\",\"order_date\":\"2023-03-10\",\"prev_order_date\":null},{\"customer_name\":\"Alice Johnson\",\"order_date\":\"2023-05-20\",\"prev_o",
+    "basePass": true,
+    "baseSql": "SELECT c.name AS customer_name, o.order_date, LAG(o.order_date) OVER (PARTITION BY c.id ORDER BY o.order_date) AS prev_order_date FROM customers c JOIN orders o",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name, o.order_date, LAG(o.order_date) OVER (ORDER BY o.order_date) AS prev_order_date FROM customers c JOIN orders o ON c.id = o.customer_id ORDER BY c"
+  },
+  {
+    "prompt": "Write a SELECT query to find the average salary per department. Return department and avg_salary.",
+    "expected": "[{\"department\":\"Engineering\",\"avg_salary\":92500},{\"department\":\"Sales\",\"avg_salary\":72500},{\"department\":\"Marketing\",\"avg_salary\":65000}]",
+    "basePass": true,
+    "baseSql": "SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;",
+    "tunedPass": true,
+    "tunedSql": "SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;"
+  },
+  {
+    "prompt": "Write a SELECT query to list each book with its price and how much it differs from the average book ",
+    "expected": "[{\"title\":\"The Lord of the Rings\",\"price\":20,\"price_diff\":8},{\"title\":\"One Hundred Years of Solitude\",\"price\":15,\"price_diff\":3},{\"title\":\"Kafka on th",
+    "basePass": true,
+    "baseSql": "WITH book_avg AS ( SELECT AVG(price) AS avg_price FROM books ), book_price_diff AS ( SELECT title, price, price - avg_price AS price_diff FROM books, book_avg )",
+    "tunedPass": true,
+    "tunedSql": "SELECT title, price, ROUND(price - (SELECT AVG(price) FROM books), 2) AS price_diff FROM books ORDER BY price_diff DESC;"
+  },
+  {
+    "prompt": "Write a SELECT query to count how many orders each customer has placed. Return customer_name and ord",
+    "expected": "[{\"customer_name\":\"Alice Johnson\",\"order_count\":2},{\"customer_name\":\"Carol White\",\"order_count\":2},{\"customer_name\":\"Eve Davis\",\"order_count\":2},{\"cus",
+    "basePass": false,
+    "baseSql": "SELECT c.name, COUNT(o.id) as order_count FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.name ORDER BY order_count DESC;",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name, COUNT(o.id) as order_count FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.name ORDER BY order_count DESC;"
+  },
+  {
+    "prompt": "Write a SELECT query to find all employees in the Engineering department. Return name and salary.",
+    "expected": "[{\"name\":\"Alice\",\"salary\":90000},{\"name\":\"Carol\",\"salary\":95000}]",
+    "basePass": true,
+    "baseSql": "SELECT name, salary FROM employees WHERE department = 'Engineering';",
+    "tunedPass": true,
+    "tunedSql": "SELECT name, salary FROM employees WHERE department = 'Engineering';"
+  },
+  {
+    "prompt": "Write a SELECT query using CROSS JOIN to generate all possible size and color combinations for a pro",
+    "expected": "[{\"size_label\":\"Large\",\"color_name\":\"Black\"},{\"size_label\":\"Large\",\"color_name\":\"Blue\"},{\"size_label\":\"Large\",\"color_name\":\"Green\"},{\"size_label\":\"Lar",
+    "basePass": true,
+    "baseSql": "SELECT s.label AS size_label, c.name AS color_name FROM sizes s CROSS JOIN colors c ORDER BY s.label, c.name;",
+    "tunedPass": false,
+    "tunedSql": "SELECT s.label, c.name FROM sizes s CROSS JOIN colors c ORDER BY s.label, c.name;"
+  }
+]

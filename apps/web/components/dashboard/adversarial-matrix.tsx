@@ -34,38 +34,44 @@ export function CodeTaskView({ snapshot }: SectionProps) {
   return (
     <section
       aria-labelledby="code-task-view-title"
-      className={cn(
-        "rounded-lg border border-white/10 bg-[#101217] p-4",
-        pulseClass,
-      )}
+      className={cn("glass rounded-xl p-5", pulseClass)}
       data-testid="code-task-view"
     >
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      {/* ── Title + metrics row ───────────────────────────── */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2
             id="code-task-view-title"
-            className="text-lg font-semibold text-white"
+            className="font-serif text-xl text-white"
           >
-            B - Code Task View
+            Code Task View
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
             Prompt, weak test-run, strong fix, and test trace.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-right">
-          <Metric
-            label="Pairs"
-            value={`${snapshot.committedCount} / ${snapshot.targetPairs}`}
-          />
-          <Metric
-            label="U gap"
-            value={snapshot.uScore === null ? "--" : snapshot.uScore.toFixed(2)}
-          />
+        <div className="flex items-center gap-3">
+          <div className="surface rounded-lg px-3 py-1.5">
+            <span className="text-xs uppercase tracking-wider text-zinc-500">
+              Pairs
+            </span>
+            <span className="ml-2 font-mono text-sm font-semibold tabular-nums text-white">
+              {snapshot.committedCount} / {snapshot.targetPairs}
+            </span>
+          </div>
+          <div className="surface rounded-lg px-3 py-1.5">
+            <span className="text-xs uppercase tracking-wider text-zinc-500">
+              U gap
+            </span>
+            <span className="ml-2 font-mono text-sm font-semibold tabular-nums text-white">
+              {snapshot.uScore === null ? "--" : snapshot.uScore.toFixed(2)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Task prompt + language */}
-      <div className="mb-4 rounded-md border border-white/10 bg-black/25 p-3">
+      {/* ── Challenge card ────────────────────────────────── */}
+      <div className="mt-4 rounded-lg border border-white/10 bg-black/25 p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-white">
           <Sparkles className="size-4 text-amber-300" aria-hidden="true" />
           Challenge
@@ -81,10 +87,11 @@ export function CodeTaskView({ snapshot }: SectionProps) {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* ── Weak vs Strong solver columns ─────────────────── */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {/* Weak solver column */}
-        <div className="rounded-md border border-white/10 bg-black/25 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
             <Bot className="size-4 text-sky-300" aria-hidden="true" />
             Weak solver
           </div>
@@ -109,8 +116,8 @@ export function CodeTaskView({ snapshot }: SectionProps) {
         </div>
 
         {/* Strong solver column */}
-        <div className="rounded-md border border-white/10 bg-black/25 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
             <ShieldCheck
               className="size-4 text-emerald-300"
               aria-hidden="true"
@@ -148,9 +155,9 @@ export function CodeTaskView({ snapshot }: SectionProps) {
         </div>
       </div>
 
-      {/* Gate state + recipe */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-white/10 bg-black/25 p-3">
+      {/* ── Gate state + Recipe focus ──────────────────────── */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-white">
             {snapshot.lastRejectedReason ? (
               <AlertTriangle
@@ -173,7 +180,7 @@ export function CodeTaskView({ snapshot }: SectionProps) {
                 : "Waiting for a pair decision."}
           </p>
         </div>
-        <div className="rounded-md border border-white/10 bg-black/25 p-3">
+        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-white">
             <GitCompareArrows
               className="size-4 text-sky-300"
@@ -257,17 +264,6 @@ function TestRunSummary({
           )}
         </details>
       )}
-    </div>
-  );
-}
-
-export function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-black/25 px-3 py-2">
-      <div className="text-xs uppercase tracking-normal text-zinc-500">
-        {label}
-      </div>
-      <div className="mt-1 text-lg font-semibold text-white">{value}</div>
     </div>
   );
 }

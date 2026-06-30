@@ -1,0 +1,29 @@
+{
+  "n": 10,
+  "results": [
+    {
+      "model": "deepseek-coder-1.3b (base)",
+      "passed": 8,
+      "total": 10,
+      "passAt1": 0.8
+    },
+    {
+      "model": "deepseek-coder-1.3b (fine-tuned)",
+      "passed": 6,
+      "total": 10,
+      "passAt1": 0.6
+    },
+    {
+      "model": "deepseek-chat (V3, large)",
+      "passed": 8,
+      "total": 10,
+      "passAt1": 0.8
+    },
+    {
+      "model": "deepseek-reasoner (R1, large)",
+      "passed": 9,
+      "total": 10,
+      "passAt1": 0.9
+    }
+  ]
+}

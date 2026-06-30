@@ -20,38 +20,37 @@ const STEPS = [
   551, 556, 561, 566, 570,
 ];
 const LOSSES = [
-  6.1725, 6.4225, 6.5912, 6.6252, 6.4671, 6.7796, 5.9887, 6.6303, 6.1698,
-  6.3662, 6.7062, 6.125, 5.9801, 5.9413, 6.2355, 5.8364, 6.2863, 6.8364, 6.5217,
-  6.5505, 6.9697, 6.1182, 5.8961, 5.8213, 6.2114, 6.3434, 5.8633, 6.2714,
-  6.3774, 6.4017, 6.0459, 5.9559, 6.5261, 6.4774, 5.8816, 5.6387, 6.3183,
-  5.9053, 6.2121, 5.8592, 6.0504, 6.9747, 6.4938, 6.5659, 6.6653, 6.0798,
-  6.4894, 6.6011, 6.2146, 6.0699, 5.9569, 5.9089, 5.9915, 6.7592, 6.9518,
-  6.3425, 5.9264, 6.6398, 5.5129, 6.3576, 6.7648, 6.0442, 6.9811, 6.3693,
-  5.5462, 6.5126, 6.1993, 6.0694, 6.3354, 5.6796, 6.0314, 6.241, 6.8086, 6.8063,
-  6.3675, 5.9366, 5.9162, 6.1941, 6.2612, 6.0507, 6.0854, 6.2796, 5.8373,
-  6.1487, 6.5479, 7.0132, 5.9593, 5.8743, 6.2596, 6.2214, 5.932, 6.5279, 6.232,
-  6.2103, 6.5367, 6.9699, 6.7053, 5.9458, 5.9489, 6.3102, 6.3192, 6.4561,
-  6.1028, 6.198, 5.6126, 6.1336, 6.2205, 6.1817, 6.5998, 6.0697, 6.6972, 6.8236,
-  6.8331, 6.957, 5.6824,
+  3.4521, 3.1107, 2.8848, 2.7068, 2.5571, 2.4324, 2.3418, 2.2581, 2.19, 2.1334,
+  2.0842, 2.0449, 2.0052, 1.97, 1.9373, 1.9102, 1.8922, 1.8759, 1.8524, 1.8354,
+  1.8233, 1.8021, 1.7948, 1.787, 1.7784, 1.7645, 1.7578, 1.7484, 1.7418, 1.7254,
+  1.7233, 1.706, 1.6926, 1.6916, 1.6812, 1.6794, 1.6698, 1.6539, 1.6542, 1.6395,
+  1.6364, 1.6296, 1.626, 1.6244, 1.62, 1.6159, 1.6147, 1.6122, 1.6062, 1.6045,
+  1.6042, 1.6067, 1.6021, 1.6104, 1.5967, 1.5939, 1.5993, 1.5994, 1.5927,
+  1.5907, 1.5894, 1.5797, 1.5707, 1.571, 1.574, 1.562, 1.5657, 1.5652, 1.562,
+  1.5659, 1.5657, 1.5733, 1.5677, 1.5641, 1.5658, 1.5663, 1.5748, 1.5698,
+  1.5512, 1.5536, 1.5599, 1.5555, 1.5572, 1.5601, 1.558, 1.5643, 1.5623, 1.571,
+  1.5709, 1.5805, 1.5774, 1.5838, 1.579, 1.586, 1.5909, 1.5992, 1.5932, 1.6056,
+  1.609, 1.6167, 1.6193, 1.6227, 1.6266, 1.6303, 1.6408, 1.6461, 1.6595, 1.6588,
+  1.669, 1.6712, 1.6829, 1.6934, 1.704, 1.7152, 1.7234,
 ];
-const STATS = { il: 6.1725, fl: 5.6824, ml: 5.5129, rd: 7.9 };
+const STATS = { il: 3.4521, fl: 1.7234, ml: 1.5512, rd: 50.1 };
 const MECHS = [
-  ["responsive-grid", 110],
-  ["modal-focus-trap", 110],
-  ["form-validation", 90],
-  ["dropdown-menu", 80],
-  ["toast-system", 100],
-  ["carousel", 100],
-  ["tabs", 100],
-  ["accordion", 90],
-  ["infinite-scroll", 90],
-  ["drag-drop", 90],
-  ["tooltip", 90],
-  ["search-autocomplete", 90],
-  ["data-table", 90],
-  ["stepper-wizard", 90],
-  ["pagination", 95],
-  ["skeleton-loader", 100],
+  ["SELECT + WHERE filtering", 130],
+  ["JOIN operations", 125],
+  ["GROUP BY + aggregation", 120],
+  ["subqueries + CTEs", 110],
+  ["window functions", 100],
+  ["UNION / INTERSECT / EXCEPT", 85],
+  ["NULL handling + COALESCE", 90],
+  ["string manipulation", 85],
+  ["date / time queries", 80],
+  ["list + dict comprehensions", 105],
+  ["error handling (try/except)", 95],
+  ["file I/O operations", 85],
+  ["regex pattern matching", 80],
+  ["recursion + iteration", 75],
+  ["type annotations + validation", 75],
+  ["async patterns + generators", 75],
 ];
 
 function LossChart() {
@@ -70,8 +69,8 @@ function LossChart() {
       H = 360;
     const pad = { top: 20, right: 20, bottom: 40, left: 50 };
     const ph = H - pad.top - pad.bottom;
-    const yMin = 4,
-      yMax = 7;
+    const yMin = 1.4,
+      yMax = 3.6;
     const sy = (v: number) => pad.top + ph * (1 - (v - yMin) / (yMax - yMin));
     const sx = (i: number) =>
       pad.left + (i / (STEPS.length - 1)) * (W - pad.left - pad.right);
@@ -158,7 +157,7 @@ export default function TrainingPage() {
           React.createElement(
             "p",
             { className: "text-sm text-zinc-500" },
-            "QLoRA fine-tuning \u2014 Gemma 4 26B-A4B-it",
+            "LoRA fine-tuning \u2014 DeepSeek-Coder 1.3B",
           ),
         ),
       ),
@@ -313,10 +312,10 @@ export default function TrainingPage() {
               "dl",
               { className: "space-y-3" },
               [
-                ["GPU", "H100 80GB (MassedCompute)"],
+                ["GPU", "H100 80GB (RunPod)"],
                 ["Duration", "~25 min"],
                 ["Cost", "$0.98"],
-                ["Adapter", "peytonali/gemma-bbb-lora"],
+                ["Adapter", "peytonali/deepseek-coder-bbb-lora"],
               ].map(([l, v]: string[]) =>
                 React.createElement(
                   "div",
@@ -340,7 +339,7 @@ export default function TrainingPage() {
             React.createElement(
               "a",
               {
-                href: "https://huggingface.co/peytonali/gemma-bbb-lora",
+                href: "https://huggingface.co/peytonali/deepseek-coder-bbb-lora",
                 target: "_blank",
                 rel: "noopener noreferrer",
                 className:
