@@ -1,82 +1,242 @@
 [
   {
-    "prompt": "Write a SELECT query to find all pairs of customers who live in the same city. Return city, name1, a",
-    "expected": "[{\"city\":\"Chicago\",\"name1\":\"Carol White\",\"name2\":\"Frank Wilson\"},{\"city\":\"Los Angeles\",\"name1\":\"Bob Smith\",\"name2\":\"Eve Davis\"},{\"city\":\"Los Angeles\",",
+    "prompt": "For each student, show the school_year, previous year's enrollment (prev_enrollment), and the differ",
+    "expected": "[{\"student_id\":101,\"school_year\":\"2020-2021\",\"prev_enrollment\":null,\"enrollment_change\":null},{\"student_id\":101,\"school_year\":\"2021-2022\",\"prev_enroll",
     "basePass": true,
-    "baseSql": "SELECT c1.city, c1.name AS name1, c2.name AS name2 FROM customers c1 JOIN customers c2 ON c1.city = c2.city AND c1.id < c2.id ORDER BY c1.city, name1;",
+    "baseSql": "SELECT student_id, school_year, prev_enrollment, enrollment_count - prev_enrollment AS enrollment_change FROM ( SELECT student_id, school_year, grade_level, enr",
     "tunedPass": true,
-    "tunedSql": "SELECT c1.city, c1.name AS name1, c2.name AS name2 FROM customers c1 JOIN customers c2 ON c1.city = c2.city AND c1.id < c2.id ORDER BY c1.city, name1;"
+    "tunedSql": "SELECT e.student_id, e.school_year, LAG(e.enrollment_count) OVER (PARTITION BY e.student_id ORDER BY e.school_year) AS prev_enrollment, e.enrollment_count - LAG"
   },
   {
-    "prompt": "Write a SELECT query using two CTEs: first compute the total quantity sold per product (cte_sales), ",
-    "expected": "[{\"product_name\":\"Notebook\",\"quantity_sold\":15,\"avg_across_all\":4.625},{\"product_name\":\"Mouse\",\"quantity_sold\":6,\"avg_across_all\":4.625},{\"product_nam",
-    "basePass": true,
-    "baseSql": "WITH cte_sales AS ( SELECT product_id, SUM(quantity) AS quantity_sold FROM order_items GROUP BY product_id ), cte_avg AS ( SELECT AVG(quantity_sold) AS avg_acro",
-    "tunedPass": true,
-    "tunedSql": "WITH cte_sales AS ( SELECT product_id, SUM(quantity) AS quantity_sold FROM order_items GROUP BY product_id ), cte_avg AS ( SELECT AVG(quantity_sold) AS avg_acro"
-  },
-  {
-    "prompt": "Write a SELECT query to find the most expensive book. Return title and price.",
-    "expected": "[{\"title\":\"The Lord of the Rings\",\"price\":20}]",
-    "basePass": true,
-    "baseSql": "SELECT title, price FROM books ORDER BY price DESC LIMIT 1;",
-    "tunedPass": true,
-    "tunedSql": "SELECT title, price FROM books ORDER BY price DESC LIMIT 1;"
-  },
-  {
-    "prompt": "Write a SELECT query using IN to find students who are enrolled in courses taught by Dr. Adams. Retu",
-    "expected": "[{\"student_name\":\"Alice Johnson\"},{\"student_name\":\"Carol White\"},{\"student_name\":\"Frank Wilson\"}]",
+    "prompt": "For each movie, ordered by rating_date, find the movie_id, user_id, current_rating, and previous_rat",
+    "expected": "[{\"movie_id\":1,\"user_id\":101,\"current_rating\":5,\"previous_rating\":null},{\"movie_id\":1,\"user_id\":102,\"current_rating\":4,\"previous_rating\":5},{\"movie_id",
     "basePass": false,
-    "baseSql": "SELECT s.name FROM students s INNER JOIN enrollments e ON s.id = e.student_id INNER JOIN courses c ON e.course_id = c.id INNER JOIN professors p ON c.professor_",
-    "tunedPass": false,
-    "tunedSql": "SELECT s.name FROM students s INNER JOIN enrollments e ON s.id = e.student_id INNER JOIN courses c ON c.id = e.course_id INNER JOIN professors p ON p.id = c.pro"
-  },
-  {
-    "prompt": "Write a SELECT query using LAG() to show each customer's orders with the date of their previous orde",
-    "expected": "[{\"customer_name\":\"Alice Johnson\",\"order_date\":\"2023-03-10\",\"prev_order_date\":null},{\"customer_name\":\"Alice Johnson\",\"order_date\":\"2023-05-20\",\"prev_o",
-    "basePass": true,
-    "baseSql": "SELECT c.name AS customer_name, o.order_date, LAG(o.order_date) OVER (PARTITION BY c.id ORDER BY o.order_date) AS prev_order_date FROM customers c JOIN orders o",
-    "tunedPass": false,
-    "tunedSql": "SELECT c.name, o.order_date, LAG(o.order_date) OVER (ORDER BY o.order_date) AS prev_order_date FROM customers c JOIN orders o ON c.id = o.customer_id ORDER BY c"
-  },
-  {
-    "prompt": "Write a SELECT query to find the average salary per department. Return department and avg_salary.",
-    "expected": "[{\"department\":\"Engineering\",\"avg_salary\":92500},{\"department\":\"Sales\",\"avg_salary\":72500},{\"department\":\"Marketing\",\"avg_salary\":65000}]",
-    "basePass": true,
-    "baseSql": "SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;",
+    "baseSql": "SELECT movie_id, user_id, current_rating, LAG(current_rating, 1) OVER (PARTITION BY movie_id ORDER BY rating_date) AS previous_rating FROM movie_ratings;",
     "tunedPass": true,
-    "tunedSql": "SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;"
+    "tunedSql": "SELECT movie_id, user_id, rating AS current_rating, LAG(rating) OVER (PARTITION BY movie_id ORDER BY rating_date) AS previous_rating FROM movie_ratings ORDER BY"
   },
   {
-    "prompt": "Write a SELECT query to list each book with its price and how much it differs from the average book ",
-    "expected": "[{\"title\":\"The Lord of the Rings\",\"price\":20,\"price_diff\":8},{\"title\":\"One Hundred Years of Solitude\",\"price\":15,\"price_diff\":3},{\"title\":\"Kafka on th",
-    "basePass": true,
-    "baseSql": "WITH book_avg AS ( SELECT AVG(price) AS avg_price FROM books ), book_price_diff AS ( SELECT title, price, price - avg_price AS price_diff FROM books, book_avg )",
-    "tunedPass": true,
-    "tunedSql": "SELECT title, price, ROUND(price - (SELECT AVG(price) FROM books), 2) AS price_diff FROM books ORDER BY price_diff DESC;"
-  },
-  {
-    "prompt": "Write a SELECT query to count how many orders each customer has placed. Return customer_name and ord",
-    "expected": "[{\"customer_name\":\"Alice Johnson\",\"order_count\":2},{\"customer_name\":\"Carol White\",\"order_count\":2},{\"customer_name\":\"Eve Davis\",\"order_count\":2},{\"cus",
+    "prompt": "For each book, list the book_id, member_id, the return_date of the previous loan (previous_return_da",
+    "expected": "[{\"book_id\":101,\"member_id\":1,\"previous_return_date\":null,\"next_loan_date\":\"2024-02-05\"},{\"book_id\":101,\"member_id\":2,\"previous_return_date\":\"2024-01-",
     "basePass": false,
-    "baseSql": "SELECT c.name, COUNT(o.id) as order_count FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.name ORDER BY order_count DESC;",
-    "tunedPass": false,
-    "tunedSql": "SELECT c.name, COUNT(o.id) as order_count FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.name ORDER BY order_count DESC;"
-  },
-  {
-    "prompt": "Write a SELECT query to find all employees in the Engineering department. Return name and salary.",
-    "expected": "[{\"name\":\"Alice\",\"salary\":90000},{\"name\":\"Carol\",\"salary\":95000}]",
-    "basePass": true,
-    "baseSql": "SELECT name, salary FROM employees WHERE department = 'Engineering';",
+    "baseSql": "Here is a SQL query that will give you the desired result: ```sql SELECT b.book_id, b.member_id, b.loan_date, b.return_date, l.loan_date AS previous_loan_date, ",
     "tunedPass": true,
-    "tunedSql": "SELECT name, salary FROM employees WHERE department = 'Engineering';"
+    "tunedSql": "SELECT b.book_id, b.member_id, LAG(b.return_date) OVER (PARTITION BY b.book_id ORDER BY b.loan_date) AS previous_return_date, LEAD(b.loan_date) OVER (PARTITION "
   },
   {
-    "prompt": "Write a SELECT query using CROSS JOIN to generate all possible size and color combinations for a pro",
-    "expected": "[{\"size_label\":\"Large\",\"color_name\":\"Black\"},{\"size_label\":\"Large\",\"color_name\":\"Blue\"},{\"size_label\":\"Large\",\"color_name\":\"Green\"},{\"size_label\":\"Lar",
-    "basePass": true,
-    "baseSql": "SELECT s.label AS size_label, c.name AS color_name FROM sizes s CROSS JOIN colors c ORDER BY s.label, c.name;",
+    "prompt": "Return each employee's name, their department name, their total compensation (salary + bonus), and t",
+    "expected": "[{\"employee_name\":\"Alice\",\"department_name\":\"Engineering\",\"total_compensation\":95000,\"total_project_hours\":120},{\"employee_name\":\"Charlie\",\"department",
+    "basePass": false,
+    "baseSql": "SELECT e.name, d.dept_name, (p.salary + p.bonus) AS total_compensation, SUM(p.hours) AS total_hours_worked FROM employees e JOIN departments d ON e.department_i",
     "tunedPass": false,
-    "tunedSql": "SELECT s.label, c.name FROM sizes s CROSS JOIN colors c ORDER BY s.label, c.name;"
+    "tunedSql": "SELECT e.name AS employee_name, d.dept_name AS department_name, (p.salary + p.bonus) AS total_compensation, (s.hours_worked) AS total_hours_worked FROM employee"
+  },
+  {
+    "prompt": "For each driver's trips ordered by start_time, list driver_id, trip_id, the fare of the immediately ",
+    "expected": "[{\"driver_id\":101,\"trip_id\":1,\"prev_fare\":null,\"fare_change\":null},{\"driver_id\":101,\"trip_id\":2,\"prev_fare\":12.5,\"fare_change\":5.5},{\"driver_id\":101,\"",
+    "basePass": false,
+    "baseSql": "SELECT t1.driver_id, t1.trip_id, t1.fare AS prev_fare, t2.fare AS fare_change, CASE WHEN t1.trip_id = 1 THEN NULL ELSE t2.fare - t1.fare END AS fare_change_diff",
+    "tunedPass": true,
+    "tunedSql": "SELECT driver_id, trip_id, LAG(fare) OVER (PARTITION BY driver_id ORDER BY start_time) AS prev_fare, fare - LAG(fare) OVER (PARTITION BY driver_id ORDER BY star"
+  },
+  {
+    "prompt": "For each agent, list their listing date, price, and the price of their immediately previous listing ",
+    "expected": "[{\"agent_name\":\"Alice\",\"listing_date\":\"2024-01-10\",\"price\":450000,\"prev_price\":null},{\"agent_name\":\"Alice\",\"listing_date\":\"2024-01-15\",\"price\":550000,",
+    "basePass": false,
+    "baseSql": "SELECT agent_name, listing_date, price, prev_price FROM ( SELECT agent_name, listing_date, price, LAG(price) OVER (PARTITION BY agent_name ORDER BY listing_date",
+    "tunedPass": true,
+    "tunedSql": "SELECT agent_name, listing_date, price, LAG(price) OVER (PARTITION BY agent_name ORDER BY listing_date) AS prev_price FROM realtor_listings ORDER BY agent_name,"
+  },
+  {
+    "prompt": "For each customer and order, show the customer name, order ID, total amount paid for that order (sum",
+    "expected": "[{\"customer_name\":\"Alice\",\"order_id\":1,\"total_paid\":300,\"total_quantity\":3},{\"customer_name\":\"Alice\",\"order_id\":2,\"total_paid\":300,\"total_quantity\":5}",
+    "basePass": false,
+    "baseSql": "SELECT c.name, o.id, SUM(p.amount) AS total_amount_paid, SUM(oi.quantity) AS total_quantity_of_items FROM customers c JOIN orders o ON c.id = o.customer_id JOIN",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name AS customer_name, o.id AS order_id, SUM(p.amount) AS total_amount, SUM(oi.quantity) AS total_quantity FROM customers c JOIN orders o ON c.id = o.c"
+  },
+  {
+    "prompt": "Show each member's name, their plan name, how many visits they used in June 2024, and how many remai",
+    "expected": "[{\"member_name\":\"Alice Johnson\",\"plan_name\":\"Premium\",\"visits_used\":3,\"remaining_visits\":27},{\"member_name\":\"Bob Smith\",\"plan_name\":\"Basic\",\"visits_us",
+    "basePass": false,
+    "baseSql": "SELECT m.name AS member_name, p.plan_name, COUNT(v.visit_id) AS visits_used, p.max_visits_per_month - COUNT(v.visit_id) AS remaining_visits FROM members m JOIN ",
+    "tunedPass": false,
+    "tunedSql": "SELECT m.name AS member_name, p.plan_name AS plan_name, COUNT(v.visit_id) AS visits_used, p.max_visits_per_month - COUNT(v.visit_id) AS remaining_visits FROM me"
+  },
+  {
+    "prompt": "List each user's username, their playlist name, and the total duration in seconds of all tracks in t",
+    "expected": "[{\"username\":\"alice\",\"playlist_name\":\"Chill Vibes\",\"total_duration\":435},{\"username\":\"alice\",\"playlist_name\":\"Workout\",\"total_duration\":240},{\"usernam",
+    "basePass": true,
+    "baseSql": "SELECT u.username, p.name AS playlist_name, SUM(t.duration_sec) AS total_duration FROM users u JOIN playlists p ON u.user_id = p.user_id JOIN playlist_tracks pt",
+    "tunedPass": true,
+    "tunedSql": "SELECT u.username AS username, p.name AS playlist_name, SUM(t.duration_sec) AS total_duration FROM users u JOIN playlists p ON u.user_id = p.user_id JOIN playli"
+  },
+  {
+    "prompt": "For each product in each warehouse ordered by stock_date, show the stock_date, the previous day's qu",
+    "expected": "[{\"warehouse_id\":1,\"product_id\":101,\"stock_date\":\"2024-01-01\",\"prev_quantity\":null,\"next_quantity\":45},{\"warehouse_id\":1,\"product_id\":101,\"stock_date\"",
+    "basePass": true,
+    "baseSql": "SELECT warehouse_id, product_id, stock_date, LAG(quantity) OVER (PARTITION BY warehouse_id, product_id ORDER BY stock_date) AS prev_quantity, LEAD(quantity) OVE",
+    "tunedPass": true,
+    "tunedSql": "SELECT warehouse_id, product_id, stock_date, LAG(quantity) OVER (PARTITION BY warehouse_id, product_id ORDER BY stock_date) AS prev_quantity, LEAD(quantity) OVE"
+  },
+  {
+    "prompt": "For each team, show the team, match_date, goals_for, and the goals_for from their previous match (or",
+    "expected": "[{\"team\":\"Eagles\",\"match_date\":\"2024-02-07\",\"goals_for\":0,\"prev_goals_for\":null},{\"team\":\"Eagles\",\"match_date\":\"2024-02-14\",\"goals_for\":1,\"prev_goals_",
+    "basePass": false,
+    "baseSql": "SELECT m1.team, m1.match_date, m1.goals_for, COALESCE(m2.goals_for, m1.goals_for) as prev_goals_for FROM matches m1 LEFT JOIN matches m2 ON m1.team = m2.team AN",
+    "tunedPass": true,
+    "tunedSql": "SELECT team, match_date, goals_for AS goals_for, LAG(goals_for) OVER (PARTITION BY team ORDER BY match_date) AS prev_goals_for FROM matches ORDER BY team, match"
+  },
+  {
+    "prompt": "For each customer and each product they ordered, list the customer name, product name, total quantit",
+    "expected": "[{\"customer_name\":\"Alice\",\"product_name\":\"Burger\",\"total_ordered\":3,\"amount_paid\":200},{\"customer_name\":\"Alice\",\"product_name\":\"Pizza\",\"total_ordered\"",
+    "basePass": false,
+    "baseSql": "SELECT c.name AS customer_name, oi.product_name AS product_name, SUM(oi.quantity) AS total_quantity_ordered, SUM(p.amount) AS total_amount_paid FROM customers c",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name AS customer_name, oi.product_name AS product_name, SUM(oi.quantity) AS total_quantity, SUM(p.amount) AS total_amount FROM customers c JOIN orders "
+  },
+  {
+    "prompt": "Return for each post the post_author, post_content, like_count, and comment_count, ordered by the to",
+    "expected": "[{\"post_author\":\"alice\",\"post_content\":\"Hello world!\",\"like_count\":2,\"comment_count\":2},{\"post_author\":\"bob\",\"post_content\":\"SQL is fun\",\"like_count\":",
+    "basePass": false,
+    "baseSql": "SELECT p.id AS post_id, u.username AS post_author, p.content AS post_content, COUNT(l.id) AS like_count, COUNT(c.id) AS comment_count FROM posts p JOIN users u ",
+    "tunedPass": false,
+    "tunedSql": "SELECT p.user_id AS post_author, p.content AS post_content, COUNT(l.id) AS like_count, COUNT(c.id) AS comment_count FROM posts p LEFT JOIN likes l ON p.id = l.p"
+  },
+  {
+    "prompt": "For each account, list the transaction date, current amount, and the previous transaction amount (by",
+    "expected": "[{\"account_id\":101,\"transaction_date\":\"2023-01-05\",\"current_amount\":200,\"previous_amount\":null},{\"account_id\":101,\"transaction_date\":\"2023-02-10\",\"cur",
+    "basePass": false,
+    "baseSql": "SELECT bt.account_id, bt.transaction_date, bt.amount, LAG(bt.amount, 1, 0) OVER (PARTITION BY bt.account_id ORDER BY bt.transaction_date) AS previous_amount FRO",
+    "tunedPass": true,
+    "tunedSql": "SELECT account_id, transaction_date, amount AS current_amount, LAG(amount) OVER (PARTITION BY account_id ORDER BY transaction_date) AS previous_amount FROM bank"
+  },
+  {
+    "prompt": "For each movie, ordered by date, show the user_id, their current rating, the previous rating by the ",
+    "expected": "[{\"movie_id\":1,\"user_id\":101,\"prev_rating\":null,\"rating_change\":null},{\"movie_id\":1,\"user_id\":101,\"prev_rating\":5,\"rating_change\":-3},{\"movie_id\":1,\"u",
+    "basePass": false,
+    "baseSql": "SELECT movie_id, user_id, rating, LAG(rating) OVER (PARTITION BY movie_id ORDER BY rating_date) AS prev_rating, rating - LAG(rating) OVER (PARTITION BY movie_id",
+    "tunedPass": false,
+    "tunedSql": "SELECT movie_id, user_id, rating AS current_rating, LAG(rating) OVER (PARTITION BY movie_id ORDER BY rating_date) AS prev_rating, rating - LAG(rating) OVER (PAR"
+  },
+  {
+    "prompt": "List each passenger's name, the airline name, flight number, and total amount spent on bookings for ",
+    "expected": "[{\"passenger_name\":\"Alice\",\"airline_name\":\"Delta\",\"flight_number\":\"DL100\",\"total_spent\":250},{\"passenger_name\":\"Bob\",\"airline_name\":\"United\",\"flight_n",
+    "basePass": true,
+    "baseSql": "SELECT p.name AS passenger_name, a.name AS airline_name, f.flight_number, SUM(b.price) AS total_spent FROM passengers p JOIN bookings b ON p.id = b.passenger_id",
+    "tunedPass": true,
+    "tunedSql": "SELECT p.name AS passenger_name, a.name AS airline_name, f.flight_number, SUM(b.price) AS total_spent FROM passengers p JOIN bookings b ON p.id = b.passenger_id"
+  },
+  {
+    "prompt": "List each employee's name, their department name, total hours worked across all projects, and the bu",
+    "expected": "[{\"employee_name\":\"Alice\",\"department_name\":\"Engineering\",\"total_hours\":120,\"project_budget\":100000},{\"employee_name\":\"Bob\",\"department_name\":\"Marketi",
+    "basePass": false,
+    "baseSql": "SELECT e.name AS employee_name, d.dept_name AS department_name, SUM(a.hours_worked) AS total_hours, p.project_name AS project_budget FROM employees e JOIN assig",
+    "tunedPass": true,
+    "tunedSql": "SELECT e.name AS employee_name, d.dept_name AS department_name, SUM(a.hours_worked) AS total_hours, p.budget AS project_budget FROM employees e JOIN assignments"
+  },
+  {
+    "prompt": "List each enrollment for each student and course, showing the previous and next enrollment dates for",
+    "expected": "[{\"student_id\":1,\"course_id\":\"MATH101\",\"prev_enrollment_date\":null,\"next_enrollment_date\":\"2024-02-15\"},{\"student_id\":1,\"course_id\":\"MATH101\",\"prev_en",
+    "basePass": false,
+    "baseSql": "Here is a SQL query that will list each enrollment for each student and course, showing the previous and next enrollment dates for that same student and course,",
+    "tunedPass": true,
+    "tunedSql": "SELECT e.student_id, e.course_id, LAG(e.enrollment_date) OVER (PARTITION BY e.student_id, e.course_id ORDER BY e.enrollment_date) AS prev_enrollment_date, LEAD("
+  },
+  {
+    "prompt": "For each member and book pair, find the previous return date (prev_return_date) and the number of da",
+    "expected": "[{\"member_id\":1,\"book_id\":101,\"prev_return_date\":null,\"gap_days\":null},{\"member_id\":1,\"book_id\":101,\"prev_return_date\":\"2024-01-20\",\"gap_days\":16},{\"m",
+    "basePass": false,
+    "baseSql": "SELECT l1.member_id, l1.book_id, l1.checkout_date, l1.return_date, l2.return_date AS prev_return_date, DATEDIFF(day, l1.return_date, l2.return_date) AS gap_days",
+    "tunedPass": false,
+    "tunedSql": "SELECT l1.member_id, l1.book_id, l1.checkout_date AS prev_checkout_date, l2.checkout_date AS next_checkout_date, l2.return_date AS next_return_date, l2.return_d"
+  },
+  {
+    "prompt": "Return each customer's name, total number of orders they placed, and total amount they spent across ",
+    "expected": "[{\"customer_name\":\"Alice\",\"total_orders\":2,\"total_spent\":570},{\"customer_name\":\"Charlie\",\"total_orders\":1,\"total_spent\":500},{\"customer_name\":\"Bob\",\"t",
+    "basePass": false,
+    "baseSql": "SELECT c.name AS customer_name, COUNT(o.order_id) AS total_orders, SUM(oi.price_per_unit * oi.quantity) AS total_spent FROM customers c JOIN orders o ON c.custo",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name AS customer_name, COUNT(o.order_id) AS total_orders, SUM(oi.price_per_unit * oi.quantity) AS total_spent FROM customers c JOIN orders o ON c.custo"
+  },
+  {
+    "prompt": "List each patient's name, their admission date, the ICD-10 code of any diagnosis made during that ad",
+    "expected": "[{\"patient_name\":\"Alice\",\"admission_date\":\"2024-01-10\",\"icd_code\":\"J15.9\",\"drug_name\":\"Amoxicillin\"},{\"patient_name\":\"Alice\",\"admission_date\":\"2024-01",
+    "basePass": false,
+    "baseSql": "SELECT p.name, a.admission_date, d.icd_code, m.drug_name FROM patients p JOIN admissions a ON p.patient_id = a.patient_id JOIN diagnoses d ON a.admission_id = d",
+    "tunedPass": false,
+    "tunedSql": "SELECT p.name AS patient_name, a.admission_date AS admission_date, d.icd_code AS icd_code, m.drug_name AS medication_name FROM patients p JOIN admissions a ON p"
+  },
+  {
+    "prompt": "For each ride, list the driver_id, the passenger_id of the immediately preceding ride by the same dr",
+    "expected": "[{\"driver_id\":101,\"previous_passenger\":null,\"next_passenger\":202},{\"driver_id\":101,\"previous_passenger\":201,\"next_passenger\":203},{\"driver_id\":101,\"pr",
+    "basePass": false,
+    "baseSql": "SELECT driver_id, COALESCE(LEAD(passenger_id) OVER (PARTITION BY driver_id ORDER BY start_time), NULL) AS preceding_passenger_id, COALESCE(LEAD(passenger_id) OV",
+    "tunedPass": false,
+    "tunedSql": "SELECT driver_id, LAG(passenger_id) OVER (PARTITION BY driver_id ORDER BY start_time) AS previous_passenger_id, LEAD(passenger_id) OVER (PARTITION BY driver_id "
+  },
+  {
+    "prompt": "List each member's name, their current membership type name, and the total number of check-ins they ",
+    "expected": "[{\"member_name\":\"Bob\",\"membership_type\":\"Basic\",\"total_checkins\":1}]",
+    "basePass": false,
+    "baseSql": "SELECT m.name AS member_name, mt.type_name AS membership_type, COUNT(ci.member_id) AS total_checkins FROM members m JOIN memberships ms ON m.member_id = ms.memb",
+    "tunedPass": false,
+    "tunedSql": "SELECT m.name AS member_name, mt.type_name AS membership_type, COUNT(ci.member_id) AS total_checkins FROM members m JOIN memberships ms ON m.member_id = ms.memb"
+  },
+  {
+    "prompt": "For each property type ordered by listing date, show the listing_date, price, and the price_change_f",
+    "expected": "[{\"property_type\":\"Condo\",\"listing_date\":\"2024-01-10\",\"price\":250000,\"price_change_from_prev\":0},{\"property_type\":\"Condo\",\"listing_date\":\"2024-02-14\",",
+    "basePass": false,
+    "baseSql": "SELECT property_type, listing_date, price, price - LAG(price) OVER (PARTITION BY property_type ORDER BY listing_date) AS price_change_from_prev FROM listings OR",
+    "tunedPass": false,
+    "tunedSql": "SELECT property_type, listing_date, price, LAG(price) OVER (PARTITION BY property_type ORDER BY listing_date) - price AS price_change_from_prev FROM listings OR"
+  },
+  {
+    "prompt": "For each team, ordered by match date, show the team, match_date, goals_for, and the goals_for from t",
+    "expected": "[{\"team\":\"Bears\",\"match_date\":\"2024-01-14\",\"goals_for\":1,\"prev_goals_for\":null},{\"team\":\"Bears\",\"match_date\":\"2024-01-21\",\"goals_for\":2,\"prev_goals_fo",
+    "basePass": true,
+    "baseSql": "SELECT team, match_date, goals_for, LAG(goals_for) OVER (PARTITION BY team ORDER BY match_date) AS prev_goals_for FROM matches ORDER BY team, match_date;",
+    "tunedPass": true,
+    "tunedSql": "SELECT team, match_date, goals_for AS goals_for, LAG(goals_for) OVER (PARTITION BY team ORDER BY match_date) AS prev_goals_for FROM matches ORDER BY team, match"
+  },
+  {
+    "prompt": "For each product and warehouse, show the inventory_date, previous day's quantity, and next day's qua",
+    "expected": "[{\"product_id\":1,\"warehouse_id\":101,\"inventory_date\":\"2024-01-01\",\"prev_day_qty\":null,\"next_day_qty\":55},{\"product_id\":1,\"warehouse_id\":101,\"inventory",
+    "basePass": false,
+    "baseSql": "SELECT w1.product_id, w1.warehouse_id, w1.inventory_date, w1.quantity AS current_day_qty, LAG(w1.quantity, 1) OVER (PARTITION BY w1.product_id, w1.warehouse_id ",
+    "tunedPass": true,
+    "tunedSql": "SELECT w.product_id, w.warehouse_id, w.inventory_date, LAG(w.quantity) OVER (PARTITION BY w.product_id, w.warehouse_id ORDER BY w.inventory_date) AS prev_day_qt"
+  },
+  {
+    "prompt": "List each username, their playlist name, and the number of tracks in that playlist (track_count) for",
+    "expected": "[{\"username\":\"alice\",\"playlist_name\":\"Morning Vibes\",\"track_count\":2},{\"username\":\"alice\",\"playlist_name\":\"Road Trip\",\"track_count\":1},{\"username\":\"bo",
+    "basePass": true,
+    "baseSql": "SELECT u.username, p.playlist_name, COUNT(pt.track_id) as track_count FROM users u JOIN playlists p ON u.user_id = p.user_id JOIN playlist_tracks pt ON p.playli",
+    "tunedPass": true,
+    "tunedSql": "SELECT u.username AS username, p.playlist_name AS playlist_name, COUNT(pt.track_id) AS track_count FROM users u JOIN playlists p ON u.user_id = p.user_id JOIN p"
+  },
+  {
+    "prompt": "For each customer and each of their orders, show the customer name, order ID, total amount spent on ",
+    "expected": "[{\"customer_name\":\"Alice\",\"order_id\":101,\"total_spent\":75,\"item_count\":3},{\"customer_name\":\"Alice\",\"order_id\":102,\"total_spent\":120,\"item_count\":3},{\"",
+    "basePass": false,
+    "baseSql": "SELECT c.name AS customer_name, o.order_id, SUM(o.total_amount) AS total_spent, SUM(oi.quantity) AS item_count FROM customers c JOIN orders o ON c.customer_id =",
+    "tunedPass": false,
+    "tunedSql": "SELECT c.name AS customer_name, o.order_id, SUM(oi.quantity * oi.price_per_unit) AS total_spent, SUM(oi.quantity) AS item_count FROM customers c JOIN orders o O"
+  },
+  {
+    "prompt": "For each account, show the transaction_date, current_amount, and the previous transaction's amount (",
+    "expected": "[{\"account_id\":101,\"transaction_date\":\"2024-01-01\",\"current_amount\":100,\"prev_amount\":null},{\"account_id\":101,\"transaction_date\":\"2024-01-05\",\"current",
+    "basePass": false,
+    "baseSql": "SELECT t1.transaction_date, t1.amount, COALESCE(t2.amount, 0) AS prev_amount FROM transactions t1 LEFT JOIN transactions t2 ON t1.transaction_date = DATE_ADD(t2",
+    "tunedPass": false,
+    "tunedSql": "SELECT t.transaction_date, t.amount AS current_amount, LAG(t.amount) OVER (PARTITION BY t.account_id ORDER BY t.transaction_date) AS prev_amount FROM transactio"
+  },
+  {
+    "prompt": "For each post, show the username of the post author, the post content, the total number of likes, an",
+    "expected": "[{\"username\":\"alice\",\"post_content\":\"Hello world!\",\"like_count\":2,\"comment_count\":2},{\"username\":\"alice\",\"post_content\":\"Another post\",\"like_count\":1,",
+    "basePass": false,
+    "baseSql": "SELECT u.username, p.content, COUNT(l.id) AS like_count, COUNT(c.id) AS comment_count FROM users u JOIN posts p ON u.id = p.user_id LEFT JOIN likes l ON p.id = ",
+    "tunedPass": false,
+    "tunedSql": "SELECT u.username AS username, p.content AS post_content, COUNT(l.id) AS like_count, COUNT(c.id) AS comment_count FROM users u JOIN posts p ON u.id = p.user_id "
   }
 ]

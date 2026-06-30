@@ -1,29 +1,29 @@
 {
-  "n": 10,
+  "n": 30,
   "results": [
     {
       "model": "deepseek-coder-1.3b (base)",
-      "passed": 8,
-      "total": 10,
-      "passAt1": 0.8
+      "passed": 6,
+      "total": 30,
+      "passAt1": 0.2
     },
     {
       "model": "deepseek-coder-1.3b (fine-tuned)",
-      "passed": 6,
-      "total": 10,
-      "passAt1": 0.6
+      "passed": 15,
+      "total": 30,
+      "passAt1": 0.5
     },
     {
       "model": "deepseek-chat (V3, large)",
-      "passed": 8,
-      "total": 10,
-      "passAt1": 0.8
+      "passed": 16,
+      "total": 30,
+      "passAt1": 0.5333333333333333
     },
     {
       "model": "deepseek-reasoner (R1, large)",
-      "passed": 9,
-      "total": 10,
-      "passAt1": 0.9
+      "passed": 20,
+      "total": 30,
+      "passAt1": 0.6666666666666666
     }
   ]
 }

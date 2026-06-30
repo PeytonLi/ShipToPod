@@ -100,6 +100,26 @@ function safeJson<T>(text: string): T | null {
 /* The code break-and-fix loop                                         */
 /* ------------------------------------------------------------------ */
 
+
+function coldStartSolve(task: CodeTask): string {
+  if (task.language === "sql") {
+    const fixture = task.fixture ?? "";
+    const tableMatch = fixture.match(/CREATE\s+TABLE\s+(\w+)/i);
+    const table = tableMatch ? tableMatch[1] : "t";
+    const colMatch = fixture.match(/CREATE\s+TABLE\s+\w+\s*\(([^)]+)\)/i);
+    const cols = colMatch ? colMatch[1].split(",").map(c => c.trim().split(/\s+/)[0]).filter(c => c && c !== "id") : ["name"];
+    const column = cols[0] || "id";
+    // Generate deliberately broken SQL to trigger fixable failures
+    const strategies = [
+      "SELECT " + column + ", COUNT(*) FROM " + table + " GROUP BY " + column + " HAVING 1=0;",
+      "SELECT * FROM " + table + " WHERE 1=0;",
+      "SELECT " + column + " FROM " + table + " ORDER BY " + column + " ASC;",
+    ];
+    return strategies[Math.floor(Math.random() * strategies.length)];
+  }
+  return "def broken(): return None";
+}
+
 export const runCodeLoop = async (
   config: GenerationConfig,
   emit: (event: AgentEvent) => void,
@@ -116,13 +136,19 @@ export const runCodeLoop = async (
 
   while (committed.length < current.max_pairs && iterations < maxIterations) {
     iterations++;
+    try {
 
     // 1. Challenger → CodeTask
     const task = await deps.challenge(current);
     emit({ type: "challenge_generated", task });
 
-    // 2. Student model draft
-    const weakCode = await deps.studentSolve(task);
+    // 2. Student model draft (cold-start fallback)
+    let weakCode: string;
+    try {
+      weakCode = await deps.studentSolve(task);
+    } catch {
+      weakCode = coldStartSolve(task);
+    }
     emit({ type: "weak_code_drafted", code: weakCode });
 
     // 3. Run tests on student draft — MUST fail
@@ -144,7 +170,12 @@ export const runCodeLoop = async (
     };
 
     // 4. Teacher model (DeepSeek) fix
-    const strongCode = await deps.teacherSolve(task, failure, weakCode);
+    let strongCode: string;
+    try {
+      strongCode = await deps.teacherSolve(task, failure, weakCode);
+    } catch {
+      continue;
+    }
     emit({
       type: "strong_fix_generated",
       code: strongCode,
@@ -198,6 +229,10 @@ export const runCodeLoop = async (
       const patch = await deps.synthesizeRecipe(recent);
       current = applyPatch(current, patch);
       emit({ type: "recipe_mutated", patch });
+    }
+    } catch (err) {
+      console.error("[loop] Iteration failed:", err instanceof Error ? err.message : String(err));
+      continue;
     }
   }
 
