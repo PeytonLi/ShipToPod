@@ -12,7 +12,9 @@ import { GEMMA_LORA_TRAINER_PY } from "./remote-script";
 const DEFAULT_IMAGE =
   "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04";
 const DEFAULT_REMOTE_ROOT = process.env.BBB_REMOTE_ROOT || "/workspace";
-const RUNPODCTL = process.env.RUNPODCTL_PATH || "runpodctl";
+// Resolved lazily (not at module load) so a RUNPODCTL_PATH set by a late
+// .env.local loader is still honored — ES imports are hoisted above it.
+const runpodctlBin = () => process.env.RUNPODCTL_PATH || "runpodctl";
 const DEFAULT_GPU_TYPE = "NVIDIA H100";
 
 export interface RunPodProvisionOpts {
@@ -94,11 +96,21 @@ export interface RunPodGpuType {
 // ---- Internal helpers ----
 
 function runpodctl(args: string[]): string {
-  const result = spawnSync(RUNPODCTL, ["--output", "json", ...args], {
-    encoding: "utf8",
-    env: process.env,
-    shell: process.platform === "win32",
-  });
+  const useShell = process.platform === "win32";
+  const fullArgs = ["--output", "json", ...args];
+  // With shell:true (needed on Windows for PATH/.exe resolution) the args are
+  // re-parsed by cmd.exe, which splits values on spaces — e.g. the gpu-id
+  // "NVIDIA L40S" becomes two tokens. Quote any arg containing whitespace so
+  // it reaches runpodctl as a single argument.
+  const result = spawnSync(
+    runpodctlBin(),
+    useShell ? fullArgs.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : fullArgs,
+    {
+      encoding: "utf8",
+      env: process.env,
+      shell: useShell,
+    },
+  );
   if (result.status !== 0) {
     const output = [result.stdout, result.stderr]
       .filter(Boolean)
@@ -168,6 +180,7 @@ function selectGpuId(gpuType?: string): string {
 
 export function provisionPod(opts: RunPodProvisionOpts): { podId: string } {
   const gpuId = opts.gpuType ?? selectGpuId();
+  const cloudType = opts.cloudType ?? "COMMUNITY";
   const args = [
     "pod",
     "create",
@@ -184,9 +197,16 @@ export function provisionPod(opts: RunPodProvisionOpts): { podId: string } {
     "--gpu-count",
     String(opts.gpuCount ?? 1),
     "--cloud-type",
-    opts.cloudType ?? "COMMUNITY",
+    cloudType,
+    // Expose a real TCP SSH port so scp/ssh can reach the pod. Without this the
+    // pod's runtime.ports stays empty and `runpodctl ssh info` reports
+    // "pod not ready" forever (only the web SSH proxy would exist).
+    "--ports",
+    "22/tcp",
     "--ssh",
   ];
+  // Community-cloud pods only get a routable public IP when explicitly asked.
+  if (cloudType === "COMMUNITY") args.push("--public-ip");
   const stdout = runpodctl(args);
   try {
     return { podId: parseCreatedPodId(stdout) };

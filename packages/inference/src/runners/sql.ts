@@ -70,6 +70,19 @@ function rowsFromDb(db: Database, sql: string): Record<string, unknown>[] {
   });
 }
 
+/**
+ * Canonical form of a result set for comparison: rows sorted by their JSON
+ * so equality is order-insensitive (SQL result sets are unordered unless the
+ * query specifies ORDER BY, and tasks rarely mandate a specific order).
+ */
+function canonicalRows(rows: unknown): string {
+  const arr = JSON.parse(JSON.stringify(rows)) as unknown[];
+  const sorted = [...arr].sort((a, b) =>
+    JSON.stringify(a) < JSON.stringify(b) ? -1 : 1,
+  );
+  return JSON.stringify(sorted);
+}
+
 export async function runSql(task: CodeTask, code: string): Promise<RunResult> {
   const S = await getSql();
   const db = new S.Database();
@@ -86,12 +99,10 @@ export async function runSql(task: CodeTask, code: string): Promise<RunResult> {
 
     for (const test of tests) {
       try {
-        const query = test.query.includes("SELECT") ? test.query : code;
-        const rows = rowsFromDb(db, query);
-        const jsonRows = JSON.parse(JSON.stringify(rows));
-        const expectedJson = JSON.parse(JSON.stringify(test.expected));
-        const passed =
-          JSON.stringify(jsonRows) === JSON.stringify(expectedJson);
+        // Execute the CANDIDATE's query and compare its output to EXPECTED.
+        // (The test's reference query only exists to document EXPECTED.)
+        const rows = rowsFromDb(db, code);
+        const passed = canonicalRows(rows) === canonicalRows(test.expected);
 
         if (passed) {
           tests_passed.push({ name: test.name, passed: true });
@@ -100,7 +111,7 @@ export async function runSql(task: CodeTask, code: string): Promise<RunResult> {
           tests_failed.push({
             name: test.name,
             passed: false,
-            message: `Expected ${JSON.stringify(expectedJson)}, got ${JSON.stringify(jsonRows)}`,
+            message: `Expected ${JSON.stringify(test.expected)}, got ${JSON.stringify(rows)}`,
           });
         }
       } catch (err) {

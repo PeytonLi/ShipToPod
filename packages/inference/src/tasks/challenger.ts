@@ -1,13 +1,14 @@
 import type { CodeTask, GenerationConfig } from "@shiptopod/core";
 import { randomUUID } from "node:crypto";
 import { loadBenchmarkTasks } from "./loader";
+import { fetchBrightDataTasks } from "./brightdata";
 import { deepseekChat } from "../deepseek";
 import { CHALLENGER_SYSTEM } from "../prompts";
 import { CodeTaskSchema } from "@shiptopod/core";
 
 /**
- * Challenger: samples a seed task from the benchmark and optionally
- * has DeepSeek mutate it into a harder adversarial variant.
+ * Challenger: samples a seed task from the benchmark (hardcoded + Bright Data)
+ * and optionally has DeepSeek mutate it into a harder adversarial variant.
  */
 
 interface TaskBank {
@@ -16,18 +17,25 @@ interface TaskBank {
 }
 
 let _bank: TaskBank | null = null;
+let _bankPromise: Promise<TaskBank> | null = null;
 
-function getBank(): TaskBank {
-  if (!_bank) {
-    const { train } = loadBenchmarkTasks();
-    _bank = { pool: train, used: new Set() };
+async function getBank(): Promise<TaskBank> {
+  if (_bank) return _bank;
+  if (!_bankPromise) {
+    _bankPromise = (async () => {
+      const { train } = loadBenchmarkTasks();
+      const brightDataTasks = await fetchBrightDataTasks({ maxTasks: 20 });
+      const pool = [...train, ...brightDataTasks];
+      _bank = { pool, used: new Set() };
+      return _bank;
+    })();
   }
-  return _bank;
+  return _bankPromise;
 }
 
 /** Sample a seed task from the benchmark, preferring unused ones. */
-function sampleSeed(config: GenerationConfig): CodeTask {
-  const bank = getBank();
+async function sampleSeed(config: GenerationConfig): Promise<CodeTask> {
+  const bank = await getBank();
 
   // Filter by focus language if set
   let candidates = bank.pool;
@@ -59,7 +67,7 @@ function sampleSeed(config: GenerationConfig): CodeTask {
 export async function generateAdversarialTask(
   config: GenerationConfig,
 ): Promise<CodeTask> {
-  const seed = sampleSeed(config);
+  const seed = await sampleSeed(config);
 
   // Try DeepSeek augmentation
   try {

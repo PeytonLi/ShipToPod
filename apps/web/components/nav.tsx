@@ -9,6 +9,7 @@ import {
   BarChart3,
   Layers,
   Terminal,
+  Lightbulb,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const primaryNav = [
   { href: "/", label: "Live Demo", icon: Activity },
   { href: "/training", label: "Training", icon: BarChart3 },
   { href: "/models", label: "Models", icon: Layers },
+  { href: "/architecture", label: "How It Works", icon: Lightbulb },
 ];
 
 const secondaryNav = [

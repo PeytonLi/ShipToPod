@@ -51,6 +51,59 @@ export function stripCodeFences(text: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/* Byte-level BPE repair                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Reverse-map from GPT-2's byte-to-unicode table back to raw bytes.
+ *
+ * Some vLLM serving images (notably the RunPod worker-v1-vllm builds we use
+ * for the student) leak the byte-level BPE representation instead of
+ * detokenized UTF-8 — e.g. "Ġ" (U+0120) for space, "Ċ" (U+010A) for newline.
+ * This table inverts the standard GPT-2 `bytes_to_unicode()` mapping.
+ */
+const UNICODE_TO_BYTE: Map<string, number> = (() => {
+  const bs: number[] = [];
+  for (let i = 0x21; i <= 0x7e; i++) bs.push(i); // ! .. ~
+  for (let i = 0xa1; i <= 0xac; i++) bs.push(i); // ¡ .. ¬
+  for (let i = 0xae; i <= 0xff; i++) bs.push(i); // ® .. ÿ
+  const cs = [...bs];
+  let n = 0;
+  for (let b = 0; b < 256; b++) {
+    if (!bs.includes(b)) {
+      bs.push(b);
+      cs.push(256 + n);
+      n++;
+    }
+  }
+  const map = new Map<string, number>();
+  for (let i = 0; i < bs.length; i++) {
+    map.set(String.fromCharCode(cs[i]), bs[i]);
+  }
+  return map;
+})();
+
+/**
+ * Reverse leaked GPT-2 byte-level BPE encoding (Ġ→space, Ċ→newline, …).
+ * No-op on already-clean text, so it's safe to wrap any model output.
+ */
+export function decodeByteBpe(text: string): string {
+  // Only act when the telltale markers are present; clean text passes through.
+  if (!/[ĠĊ]/.test(text)) return text;
+  const bytes: number[] = [];
+  for (const ch of text) {
+    const b = UNICODE_TO_BYTE.get(ch);
+    if (b !== undefined) {
+      bytes.push(b);
+    } else {
+      // Not a mapped glyph (already-decoded char) — keep its raw UTF-8 bytes.
+      for (const x of Buffer.from(ch, "utf8")) bytes.push(x);
+    }
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
+
+/* ------------------------------------------------------------------ */
 /* DeepSeek teacher (strong solver) — hosted API                       */
 /* ------------------------------------------------------------------ */
 
@@ -163,7 +216,8 @@ export async function studentChat(
       );
     }
     const data = (await res.json()) as ChatCompletionResponse;
-    return data.choices?.[0]?.message?.content ?? "";
+    // Some vLLM serving images leak byte-level BPE glyphs; repair before use.
+    return decodeByteBpe(data.choices?.[0]?.message?.content ?? "");
   }, opts);
 }
 
