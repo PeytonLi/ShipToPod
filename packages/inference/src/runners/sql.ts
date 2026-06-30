@@ -1,11 +1,15 @@
-import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
+import { createRequire } from "module";
 import type { CodeTask, RunResult, TestCaseResult } from "@shiptopod/core";
 
-let SQL: SqlJsStatic | null = null;
+const require = createRequire(import.meta.url);
+let _initSqlJs: any = null;
 
-async function getSql(): Promise<SqlJsStatic> {
-  if (!SQL) SQL = await initSqlJs();
-  return SQL;
+async function getSql(): Promise<any> {
+  if (!_initSqlJs) {
+    const mod = require("sql.js");
+    _initSqlJs = typeof mod === "function" ? mod : mod.default;
+  }
+  return _initSqlJs();
 }
 
 /**
