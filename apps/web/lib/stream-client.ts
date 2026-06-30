@@ -52,8 +52,10 @@ export async function streamAgentEvents({
     for (const frame of frames) {
       try {
         onEvent(decodeAgentEventMessage(frame));
-      } catch {
-        // Skip heartbeat comments, malformed frames, etc.
+      } catch (err) {
+        if (!frame.startsWith(':')) {
+          console.error('[stream-client] Bad frame:', frame.slice(0, 200), err);
+        }
       }
     }
   }

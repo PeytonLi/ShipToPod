@@ -1,7 +1,6 @@
 import type { CodeTask, GenerationConfig } from "@shiptopod/core";
 import { randomUUID } from "node:crypto";
 import { loadBenchmarkTasks } from "./loader";
-import { fetchBrightDataTasks } from "./brightdata";
 import { deepseekChat } from "../deepseek";
 import { CHALLENGER_SYSTEM } from "../prompts";
 import { CodeTaskSchema } from "@shiptopod/core";
@@ -24,7 +23,8 @@ async function getBank(): Promise<TaskBank> {
   if (!_bankPromise) {
     _bankPromise = (async () => {
       const { train } = loadBenchmarkTasks();
-      const brightDataTasks = await fetchBrightDataTasks({ maxTasks: 20 });
+      // Bright Data disabled — no API key configured
+      const brightDataTasks: CodeTask[] = [];
       const pool = [...train, ...brightDataTasks];
       _bank = { pool, used: new Set() };
       return _bank;
