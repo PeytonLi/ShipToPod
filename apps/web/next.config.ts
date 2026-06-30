@@ -22,16 +22,12 @@ loadRootEnv();
 const config: NextConfig = {
   output: "standalone",
   transpilePackages: [
-    "@brickbybrick/core",
-    "@brickbybrick/inference",
-    "@brickbybrick/trainer",
+    "@shiptopod/core",
+    "@shiptopod/inference",
+    "@shiptopod/trainer",
   ],
-  // Native / dynamically-required packages webpack must NOT bundle:
-  //  - @livekit/rtc-node ships platform-specific NAPI binaries.
-  //  - @google/genai's Live API uses `ws`, whose native `bufferutil` frame
-  //    masking breaks when bundled ("b.mask is not a function" at runtime).
-  // Externalize so they load natively from node_modules at runtime.
-  serverExternalPackages: ["@livekit/rtc-node", "@google/genai", "ws"],
+  // Native / dynamically-required packages webpack must NOT bundle.
+  serverExternalPackages: ["ws"],
 };
 
 export default config;

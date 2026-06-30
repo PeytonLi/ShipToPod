@@ -1,5 +1,5 @@
 /**
- * Full training run — loads the 1515-pair seed dataset, fine-tunes Gemma 4 26B
+ * Full training run — loads the 1515-pair seed dataset, fine-tunes DeepSeek-Coder
  * via QLoRA on an H100, pushes the adapter to Hugging Face Hub, and saves all
  * loss metrics for later evaluation/visualization.
  *
@@ -9,8 +9,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { runGemmaLoraTraining } from "@brickbybrick/trainer";
-import type { TrainingPair, LossPoint } from "@brickbybrick/core";
+import { runGemmaLoraTraining } from "@shiptopod/trainer";
+import type { TrainingPair, LossPoint } from "@shiptopod/core";
 
 const METRICS_PATH = path.join(
   import.meta.dirname,
@@ -53,7 +53,7 @@ async function main() {
   const hubRepo = (() => {
     const base = process.env.BBB_HF_HUB_REPO;
     if (!base) return undefined;
-    // Use the base name from env (e.g. "peytonali/gemma-bbb-lora") and
+    // Use the base name from env (e.g. "peytonali/deepseek-lora") and
     // append a timestamp so each run creates a distinct versioned repo.
     return `${base}-${Date.now()}`;
   })();

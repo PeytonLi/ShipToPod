@@ -1,30 +1,26 @@
-import { runGemmaLoraTraining } from "@brickbybrick/trainer";
-import type { TrainingPair } from "@brickbybrick/core";
+import { runGemmaLoraTraining } from "@shiptopod/trainer";
+import type { TrainingPair } from "@shiptopod/core";
 
 const pair: TrainingPair = {
   id: "rehearsal-pair-1",
   task: {
     id: "rehearsal-task-1",
-    prompt: "Repair a responsive card grid that overflows at mobile width.",
-    target_mechanism: "responsive-grid",
-    criteria: [
-      {
-        id: "no-overflow",
-        description: "No horizontal overflow at 375px",
-        weight: 1,
-      },
-    ],
+    prompt: "Write a Python function that checks if a number is prime.",
+    language: "python",
+    hidden_tests:
+      "assert is_prime(7) == True\nassert is_prime(4) == False\nassert is_prime(1) == False\nassert is_prime(2) == True",
   },
   weak_code:
-    '<div className="grid grid-cols-3 gap-4"><article className="w-96">Long content</article></div>',
-  defect: {
-    screenshot: "",
-    dom_trace: "article.w-96 exceeds viewport width",
-    category: "overflow",
-    severity: "high",
+    "def is_prime(n):\n    for i in range(2, n):\n        if n % i == 0:\n            return False\n    return True",
+  failure: {
+    test_name: "test_is_prime_one",
+    message:
+      "AssertionError: is_prime(1) should return False, got True (loop skipped, returned True)",
+    language: "python",
+    code: "def is_prime(n):\n    for i in range(2, n):\n        if n % i == 0:\n            return False\n    return True",
   },
   strong_code:
-    '<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"><article className="min-w-0">Long content</article></div>',
+    "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True",
   u_score: 1,
 };
 

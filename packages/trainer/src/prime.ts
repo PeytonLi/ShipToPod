@@ -10,11 +10,11 @@ import { basename, join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 
-import type { LossPoint, TrainingPair } from "@brickbybrick/core";
+import type { LossPoint, TrainingPair } from "@shiptopod/core";
 import { exportDataset } from "./dataset";
 import { GEMMA_LORA_TRAINER_PY } from "./remote-script";
 
-const DEFAULT_GEMMA_MODEL = "google/gemma-4-26B-A4B-it";
+const DEFAULT_BASE_MODEL = "deepseek-ai/deepseek-coder-1.3b-instruct";
 const DEFAULT_GPU_TYPE = "H100_80GB";
 const DEFAULT_IMAGE = "ubuntu_22_cuda_12";
 const DEFAULT_REMOTE_ROOT = process.env.BBB_REMOTE_ROOT || "/home/ubuntu";
@@ -421,18 +421,17 @@ function trainingPairToChatJsonl(pairs: TrainingPair[]): string {
           {
             role: "system",
             content:
-              "You repair React and CSS UI implementations. Return only corrected implementation code.",
+              "You repair Python and SQL code implementations. Return only corrected implementation code.",
           },
           {
             role: "user",
             content: [
-              `Task: ${pair.task.prompt}`,
-              `Target mechanism: ${pair.task.target_mechanism}`,
-              `Acceptance criteria: ${pair.task.criteria.map((c) => `${c.id}: ${c.description}`).join("; ")}`,
-              `Weak implementation:\n${pair.weak_code}`,
-              `Observed defect: ${pair.defect.category} (${pair.defect.severity})`,
-              `DOM trace:\n${pair.defect.dom_trace}`,
-            ].join("\n\n"),
+                `Task: ${pair.task.prompt}`,
+                `Language: ${pair.task.language}`,
+                `Weak implementation:\n${pair.weak_code}`,
+                `Test failure: ${pair.failure.test_name}`,
+                `Failure message: ${pair.failure.message}`,
+              ].join("\n\n"),
           },
           { role: "assistant", content: pair.strong_code },
         ],
@@ -453,7 +452,7 @@ function shellSingleQuote(value: string): string {
  * explicit option > process env > .env.local precedence. Blank/unset means no
  * push (training still completes; the adapter just isn't persisted).
  */
-function resolveHubRepo(
+function resolveHubRepoFromEnv(
   opts: { hubRepo?: string },
   env: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
@@ -462,6 +461,13 @@ function resolveHubRepo(
     if (trimmed) return trimmed;
   }
   return undefined;
+}
+
+/**
+ * Generate a unique Hugging Face Hub repo name for a training run.
+ */
+export function resolveHubRepo(runId: string): string {
+  return `shiptopod-deepseek-coder-${runId}`;
 }
 
 export async function runGemmaLoraTraining(
@@ -473,22 +479,22 @@ export async function runGemmaLoraTraining(
   const hfToken =
     opts.hfToken ?? process.env.HF_TOKEN ?? loadDotEnvLocal().HF_TOKEN;
   if (!hfToken)
-    throw new Error("HF_TOKEN is required for exact Gemma training");
+    throw new Error("HF_TOKEN is required for LoRA training");
 
-  const runName = opts.runName ?? `bbb-gemma-${Date.now()}`;
+  const runName = opts.runName ?? `shiptopod-deepseek-${Date.now()}`;
   const modelId =
-    opts.modelId ?? process.env.BBB_GEMMA_MODEL ?? DEFAULT_GEMMA_MODEL;
+    opts.modelId ?? process.env.BBB_DEEPSEEK_MODEL ?? DEFAULT_BASE_MODEL;
   const epochs = opts.epochs ?? Number(process.env.BBB_TRAINING_EPOCHS ?? 3);
   const maxSteps =
     opts.maxSteps ??
     (process.env.BBB_TRAINING_MAX_STEPS
       ? Number(process.env.BBB_TRAINING_MAX_STEPS)
       : undefined);
-  const hubRepo = resolveHubRepo(opts, {
+  const hubRepo = resolveHubRepoFromEnv(opts, {
     ...loadDotEnvLocal(),
     ...process.env,
   });
-  const localDir = mkdtempSync(join(tmpdir(), "bbb-gemma-"));
+  const localDir = mkdtempSync(join(tmpdir(), "shiptopod-deepseek-"));
   let podId = "";
 
   try {
@@ -503,7 +509,7 @@ export async function runGemmaLoraTraining(
     const target = parseSshTarget(status.ssh!);
     const remoteDir = `${opts.remoteRoot ?? DEFAULT_REMOTE_ROOT}/${runName}`;
     const datasetPath = join(localDir, "dataset.jsonl");
-    const scriptPath = join(localDir, "train_gemma_lora.py");
+    const scriptPath = join(localDir, "train_lora.py");
     writeFileSync(datasetPath, trainingPairToChatJsonl(opts.pairs), "utf8");
     writeFileSync(scriptPath, GEMMA_LORA_TRAINER_PY, "utf8");
 
@@ -628,7 +634,7 @@ function buildDetachedTrainingCommand(opts: {
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade pip`,
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu124`,
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade "transformers>=4.49.0" "datasets>=3.0.0" "accelerate>=1.2.0" "peft>=0.14.0" "trl>=0.25.0" "bitsandbytes>=0.45.0" "pillow>=11.0.0" "huggingface_hub>=0.27.0"`,
-    `HF_TOKEN=${shellSingleQuote(opts.hfToken)} nohup ${shellSingleQuote(opts.remoteDir)}/.py/bin/python train_gemma_lora.py --dataset dataset.jsonl --output adapter --model ${shellSingleQuote(opts.modelId)}${stepsFlag}${pushFlag} > ${shellSingleQuote(opts.remoteDir)}/training.log 2>&1 &`,
+    `HF_TOKEN=${shellSingleQuote(opts.hfToken)} nohup ${shellSingleQuote(opts.remoteDir)}/.py/bin/python train_lora.py --dataset dataset.jsonl --output adapter --model ${shellSingleQuote(opts.modelId)}${stepsFlag}${pushFlag} > ${shellSingleQuote(opts.remoteDir)}/training.log 2>&1 &`,
     `echo "PID=$!" > ${shellSingleQuote(opts.remoteDir)}/train.pid`,
     `echo "DETACHED_LAUNCH_OK"`,
   ].join("\n");
@@ -679,7 +685,7 @@ async function streamRemoteTraining(
     child.stderr?.on("data", (chunk) => opts.onLog?.(chunk.toString().trim()));
     child.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`Remote Gemma training exited with code ${code}`));
+      else reject(new Error(`Remote training exited with code ${code}`));
     });
     child.on("error", reject);
   });
@@ -714,7 +720,7 @@ function buildRemoteTrainingCommand(opts: {
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade pip`,
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu124`,
     `${shellSingleQuote(opts.remoteDir)}/.py/bin/python -m pip install --upgrade "transformers>=4.49.0" "datasets>=3.0.0" "accelerate>=1.2.0" "peft>=0.14.0" "trl>=0.25.0" "bitsandbytes>=0.45.0" "pillow>=11.0.0" "huggingface_hub>=0.27.0"`,
-    `HF_TOKEN=${shellSingleQuote(opts.hfToken)} ${shellSingleQuote(opts.remoteDir)}/.py/bin/python train_gemma_lora.py --dataset dataset.jsonl --output adapter --model ${shellSingleQuote(opts.modelId)}${stepsFlag}${pushFlag}`,
+    `HF_TOKEN=${shellSingleQuote(opts.hfToken)} ${shellSingleQuote(opts.remoteDir)}/.py/bin/python train_lora.py --dataset dataset.jsonl --output adapter --model ${shellSingleQuote(opts.modelId)}${stepsFlag}${pushFlag}`,
   ].join(" && ");
 }
 
@@ -785,7 +791,7 @@ export async function serveAdapter(
   opts: ServeAdapterOpts,
 ): Promise<ServeHandle> {
   const baseModel =
-    opts.baseModel ?? process.env.BBB_GEMMA_MODEL ?? DEFAULT_GEMMA_MODEL;
+    opts.baseModel ?? process.env.BBB_DEEPSEEK_MODEL ?? DEFAULT_BASE_MODEL;
   const port = opts.port ?? 8000;
   const ttlMs = opts.ttlMs ?? 30 * 60_000;
   runRemote(
@@ -817,7 +823,7 @@ export const internalPrimeTestUtils = {
   trainingPairToChatJsonl,
   numberFromStatus,
   buildRemoteTrainingCommand,
-  resolveHubRepo,
+  resolveHubRepoFromEnv,
   buildServeCommand,
 };
 

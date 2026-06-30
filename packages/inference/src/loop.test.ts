@@ -1,51 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   GenerationConfigSchema,
   type AgentEvent,
   type AgentEventType,
-  type AuditStep,
-  type Defect,
+  type CodeTask,
   type GenerationConfig,
-  type RunVisualLoop,
+  type RunCodeLoop,
   type TrainingPair,
-  type VisualTask,
-} from "@brickbybrick/core";
-import {
-  runVisualLoop,
-  makeDiff,
-  defaultDeps,
-  buildChallengerPrompt,
-  type VisualLoopDeps,
-  type AuditResult,
-} from "./loop";
-import type { AntigravityUsage, InteractionResult } from "./antigravity";
+} from "@shiptopod/core";
+import { runCodeLoop, makeDiff, type CodeLoopDeps } from "./loop";
 
 // Compile-time proof the entry matches the frozen contract.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _contract: RunVisualLoop = runVisualLoop;
+const _contract: RunCodeLoop = runCodeLoop;
 
-const task: VisualTask = {
+const task: CodeTask = {
   id: "grid-1",
   prompt: "Build a responsive product card grid.",
-  target_mechanism: "responsive-card-grid",
-  criteria: [
-    { id: "a", description: "no overflow at 375px", weight: 0.5 },
-    { id: "b", description: "cards wrap", weight: 0.5 },
-  ],
-};
-
-const defect = (category: Defect["category"] = "overflow"): Defect => ({
-  screenshot: "PNG",
-  dom_trace: "trace",
-  category,
-  severity: "high",
-});
-
-const auditStep: AuditStep = {
-  screenshot: "PNG",
-  action: "resize",
-  intent: "mobile",
-  viewport: { width: 375, height: 812 },
+  language: "python",
+  hidden_tests: "def test_grid(): pass",
 };
 
 function cfg(over: Partial<GenerationConfig> = {}): GenerationConfig {
@@ -61,28 +34,44 @@ const types = (events: AgentEvent[], ...keep: AgentEventType[]) =>
   events.filter((e) => keep.includes(e.type)).map((e) => e.type);
 
 /**
- * Base mock deps producing one committable pair: weak code fails the audit with
- * a defect (S_weak=0), strong code passes (S_strong=1) ⇒ 𝒰=1. Each call gets a
- * distinct orthogonal embedding so the diversity gate never trips by default.
+ * Base mock deps producing one committable pair: weak code fails the run tests
+ * (sScore=0), strong code passes (sScore=1) ⇒ 𝒰=1. Each call gets a distinct
+ * orthogonal embedding so the diversity gate never trips by default.
+ *
+ * The runTests mock returns a RunResult-compatible shape so that both the loop's
+ * `.passed` check and scoreRun's `.tests_passed.length` work.
  */
-function makeDeps(over: Partial<VisualLoopDeps> = {}): VisualLoopDeps {
+function makeDeps(over: Partial<CodeLoopDeps> = {}): CodeLoopDeps {
   let embedCall = 0;
   let idCall = 0;
   return {
     challenge: async () => task,
-    weakSolver: async () => "WEAK",
-    strongSolver: async () => "STRONG",
-    audit: async (_task, code, emit): Promise<AuditResult> => {
-      emit({ type: "audit_step", step: auditStep });
+    studentSolve: async () => "WEAK",
+    teacherSolve: async () => "STRONG",
+    runTests: async (_task, code) => {
       if (code === "WEAK") {
         return {
           passed: false,
-          passedCriteria: [],
-          defect: defect(),
-          steps: [auditStep],
+          sScore: 0,
+          tests_passed: [] as { name: string; passed: boolean }[],
+          tests_failed: [
+            { name: "test_overflow", passed: false, message: "overflow" },
+          ],
         };
       }
-      return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] };
+      return {
+        passed: true,
+        sScore: 1,
+        tests_passed: [
+          { name: "a", passed: true },
+          { name: "b", passed: true },
+        ] as { name: string; passed: boolean }[],
+        tests_failed: [] as {
+          name: string;
+          passed: boolean;
+          message?: string;
+        }[],
+      };
     },
     embed: async () => {
       const v = new Array(64).fill(0);
@@ -95,72 +84,67 @@ function makeDeps(over: Partial<VisualLoopDeps> = {}): VisualLoopDeps {
   };
 }
 
-describe("runVisualLoop — event ordering (ARCHITECTURE §5 happy path)", () => {
-  it("emits the structural events in order and streams audit steps + narration", async () => {
+describe("runCodeLoop — event ordering (ARCHITECTURE §5 happy path)", () => {
+  it("emits the structural events in order", async () => {
     const { events, emit } = collect();
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, makeDeps());
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, makeDeps());
 
     expect(
       types(
         events,
         "challenge_generated",
         "weak_code_drafted",
-        "defect_found",
+        "weak_run_result",
         "strong_fix_generated",
-        "audit_pass",
+        "strong_run_result",
         "pair_committed",
       ),
     ).toEqual([
       "challenge_generated",
       "weak_code_drafted",
-      "defect_found",
+      "weak_run_result",
       "strong_fix_generated",
-      "audit_pass",
+      "strong_run_result",
       "pair_committed",
     ]);
-
-    expect(events.some((e) => e.type === "audit_step")).toBe(true);
-    expect(events.some((e) => e.type === "narration")).toBe(true);
-
-    // audit steps for the weak draft arrive before the defect is reported
-    const firstAuditStep = events.findIndex((e) => e.type === "audit_step");
-    const defectIdx = events.findIndex((e) => e.type === "defect_found");
-    expect(firstAuditStep).toBeGreaterThanOrEqual(0);
-    expect(firstAuditStep).toBeLessThan(defectIdx);
   });
 
   it("commits a pair carrying the real 𝒰 score", async () => {
     const { events, emit } = collect();
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, makeDeps());
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, makeDeps());
     const committed = events.find((e) => e.type === "pair_committed");
     expect(committed).toBeDefined();
     if (committed?.type === "pair_committed") {
       expect(committed.u_score).toBeCloseTo(1, 10);
       expect(committed.pair.weak_code).toBe("WEAK");
       expect(committed.pair.strong_code).toBe("STRONG");
-      expect(committed.pair.defect.category).toBe("overflow");
+      expect(committed.pair.failure.test_name).toBe("test_overflow");
     }
   });
 });
 
 describe("filter gate — weak pass ⇒ too_easy", () => {
-  it("rejects as too_easy and never reports a defect or commits", async () => {
+  it("rejects as too_easy and never commits", async () => {
     const { events, emit } = collect();
     const deps = makeDeps({
-      // weak code passes the audit: no learning signal
-      audit: async (_t, _code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] };
-      },
+      // weak code passes the tests: no learning signal
+      runTests: async () => ({
+        passed: true,
+        sScore: 1,
+        tests_passed: [
+          { name: "a", passed: true },
+          { name: "b", passed: true },
+        ],
+        tests_failed: [],
+      }),
       maxIterations: 3,
     });
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, deps);
 
     const rejected = events.filter(
       (e) => e.type === "pair_rejected" && e.reason === "too_easy",
     );
     expect(rejected.length).toBe(3);
-    expect(events.some((e) => e.type === "defect_found")).toBe(false);
     expect(events.some((e) => e.type === "pair_committed")).toBe(false);
   });
 });
@@ -169,45 +153,63 @@ describe("utility gate — commit boundary at τ", () => {
   it("commits when 𝒰 == τ (inclusive boundary)", async () => {
     const { events, emit } = collect();
     const deps = makeDeps({
-      audit: async (_t, code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
+      runTests: async (_task, code) => {
         if (code === "WEAK")
           return {
             passed: false,
-            passedCriteria: ["a"],
-            defect: defect(),
-            steps: [auditStep],
-          }; // S_weak=0.5
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] }; // S_strong=1 ⇒ 𝒰=0.5
+            sScore: 0.5,
+            tests_passed: [{ name: "a", passed: true }],
+            tests_failed: [{ name: "b", passed: false, message: "fail" }],
+          };
+        return {
+          passed: true,
+          sScore: 1,
+          tests_passed: [
+            { name: "a", passed: true },
+            { name: "b", passed: true },
+          ],
+          tests_failed: [],
+        };
       },
     });
-    await runVisualLoop(cfg({ max_pairs: 1, tau: 0.5 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 1, tau: 0.5 }), emit, deps);
     const committed = events.find((e) => e.type === "pair_committed");
     expect(committed).toBeDefined();
     if (committed?.type === "pair_committed")
       expect(committed.u_score).toBeCloseTo(0.5, 10);
   });
 
-  it("discards (no commit, no reject) when 𝒰 < τ, after a passing re-audit", async () => {
+  it("rejects as too_easy when 𝒰 < τ", async () => {
     const { events, emit } = collect();
     const deps = makeDeps({
-      audit: async (_t, code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
+      runTests: async (_task, code) => {
         if (code === "WEAK")
           return {
             passed: false,
-            passedCriteria: ["a"],
-            defect: defect(),
-            steps: [auditStep],
-          }; // S_weak=0.5
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] }; // 𝒰=0.5
+            sScore: 0.5,
+            tests_passed: [{ name: "a", passed: true }],
+            tests_failed: [{ name: "b", passed: false, message: "fail" }],
+          };
+        return {
+          passed: true,
+          sScore: 1,
+          tests_passed: [
+            { name: "a", passed: true },
+            { name: "b", passed: true },
+          ],
+          tests_failed: [],
+        };
       },
       maxIterations: 2,
     });
-    await runVisualLoop(cfg({ max_pairs: 1, tau: 0.6 }), emit, deps); // 0.5 < 0.6
-    expect(events.some((e) => e.type === "audit_pass")).toBe(true); // reached the τ gate
+    await runCodeLoop(cfg({ max_pairs: 1, tau: 0.6 }), emit, deps); // 𝒰=0.5 < 0.6
+    expect(events.some((e) => e.type === "strong_run_result")).toBe(true);
+    expect(
+      events.filter(
+        (e) => e.type === "pair_rejected" && e.reason === "too_easy",
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
     expect(events.some((e) => e.type === "pair_committed")).toBe(false);
-    expect(events.some((e) => e.type === "pair_rejected")).toBe(false);
   });
 });
 
@@ -218,7 +220,7 @@ describe("diversity gate — cosine > 0.82 ⇒ redundant", () => {
       embed: async () => [1, 0, 0], // every failure embeds identically ⇒ cosine 1
       maxIterations: 3,
     });
-    await runVisualLoop(cfg({ max_pairs: 2 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 2 }), emit, deps);
 
     expect(events.filter((e) => e.type === "pair_committed").length).toBe(1);
     expect(
@@ -232,31 +234,44 @@ describe("diversity gate — cosine > 0.82 ⇒ redundant", () => {
 describe("recipe mutation cadence", () => {
   it("fires a routine recipe_mutated every N committed pairs", async () => {
     const { events, emit } = collect();
-    let cat = 0;
-    // vary the defect category each iteration so the 3-consecutive rule never trips
-    const cats: Defect["category"][] = [
-      "overflow",
-      "truncation",
-      "layout_collision",
-      "offscreen_render",
+    let call = 0;
+    // vary the test name each iteration so no pattern triggers
+    const names = [
+      "test_overflow",
+      "test_truncation",
+      "test_layout",
+      "test_offscreen",
     ];
     const deps = makeDeps({
-      audit: async (_t, code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
+      runTests: async (_task, code) => {
         if (code === "WEAK")
           return {
             passed: false,
-            passedCriteria: [],
-            defect: defect(cats[cat++ % cats.length]),
-            steps: [auditStep],
+            sScore: 0,
+            tests_passed: [],
+            tests_failed: [
+              {
+                name: names[call++ % names.length],
+                passed: false,
+                message: "fail",
+              },
+            ],
           };
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] };
+        return {
+          passed: true,
+          sScore: 1,
+          tests_passed: [
+            { name: "a", passed: true },
+            { name: "b", passed: true },
+          ],
+          tests_failed: [],
+        };
       },
       synthesizeRecipe: async () => ({
-        challenger_weights: { "responsive-card-grid": 2 },
+        challenger_weights: { python: 2 },
       }),
     });
-    await runVisualLoop(cfg({ max_pairs: 4, mutate_every_n: 2 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 4, mutate_every_n: 2 }), emit, deps);
 
     const mutations = events.filter((e) => e.type === "recipe_mutated");
     expect(mutations.length).toBe(2); // after the 2nd and 4th commit
@@ -266,28 +281,17 @@ describe("recipe mutation cadence", () => {
     }
   });
 
-  it("forces a focus mutation after 3 consecutive same-category failures", async () => {
+  it("forces a focus mutation through recipe_mutated", async () => {
     const { events, emit } = collect();
     const deps = makeDeps({
-      // always the same defect category ⇒ 3 in a row should force a focus mutation
-      audit: async (_t, code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
-        if (code === "WEAK")
-          return {
-            passed: false,
-            passedCriteria: [],
-            defect: defect("overflow"),
-            steps: [auditStep],
-          };
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] };
-      },
+      synthesizeRecipe: async () => ({
+        focus_language: "python" as const,
+      }),
     });
-    await runVisualLoop(cfg({ max_pairs: 5, mutate_every_n: 99 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 1, mutate_every_n: 1 }), emit, deps);
 
     const focusMutation = events.find(
-      (e) =>
-        e.type === "recipe_mutated" &&
-        e.patch.focus_mechanism === "responsive-card-grid",
+      (e) => e.type === "recipe_mutated" && e.patch.focus_language === "python",
     );
     expect(focusMutation).toBeDefined();
   });
@@ -310,7 +314,7 @@ describe("Prime training handoff", () => {
     );
     const deps = makeDeps({ train });
 
-    await runVisualLoop(cfg({ max_pairs: 2 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 2 }), emit, deps);
 
     expect(train).toHaveBeenCalledTimes(1);
     expect(train.mock.calls[0][0]).toHaveLength(2);
@@ -329,25 +333,20 @@ describe("Prime training handoff", () => {
     const { events, emit } = collect();
     const train = vi.fn(async () => {});
     const deps = makeDeps({
-      audit: async (_t, _code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
-        return { passed: true, passedCriteria: ["a", "b"], steps: [auditStep] };
-      },
+      runTests: async () => ({
+        passed: true,
+        sScore: 1,
+        tests_passed: [{ name: "a", passed: true }],
+        tests_failed: [],
+      }),
       train,
       maxIterations: 2,
     });
 
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, deps);
 
     expect(train).not.toHaveBeenCalled();
-    expect(
-      events.some(
-        (event) =>
-          event.type === "narration" &&
-          event.text ===
-            "No pairs were committed; skipping Prime LoRA training.",
-      ),
-    ).toBe(true);
+    expect(events.some((e) => e.type === "pair_committed")).toBe(false);
   });
 
   it("forwards failed training events without dropping committed pair events", async () => {
@@ -359,14 +358,10 @@ describe("Prime training handoff", () => {
           status: "failed",
           instance: "pod-1",
         });
-        emitEvent({
-          type: "narration",
-          text: "Prime training failed: quota unavailable",
-        });
       },
     });
 
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, deps);
 
     expect(events.some((event) => event.type === "pair_committed")).toBe(true);
     expect(
@@ -377,24 +372,27 @@ describe("Prime training handoff", () => {
   });
 });
 
-describe("strong fix that fails re-audit is discarded", () => {
-  it("does not commit when the strong re-audit fails", async () => {
+describe("strong fix that fails re-run is discarded", () => {
+  it("does not commit when the strong run tests fail", async () => {
     const { events, emit } = collect();
     const deps = makeDeps({
-      audit: async (_t, _code, emit): Promise<AuditResult> => {
-        emit({ type: "audit_step", step: auditStep });
-        // both weak and strong fail the audit
-        return {
-          passed: false,
-          passedCriteria: [],
-          defect: defect(),
-          steps: [auditStep],
-        };
-      },
+      runTests: async () => ({
+        // both weak and strong fail the tests
+        passed: false,
+        sScore: 0,
+        tests_passed: [],
+        tests_failed: [
+          { name: "test_overflow", passed: false, message: "overflow" },
+        ],
+      }),
       maxIterations: 2,
     });
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
-    expect(events.some((e) => e.type === "audit_pass")).toBe(false);
+    await runCodeLoop(cfg({ max_pairs: 1 }), emit, deps);
+    expect(
+      events.some(
+        (e) => e.type === "pair_rejected" && e.reason === "not_fixed",
+      ),
+    ).toBe(true);
     expect(events.some((e) => e.type === "pair_committed")).toBe(false);
   });
 });
@@ -408,40 +406,8 @@ describe("makeDiff", () => {
 });
 
 // ---------------------------------------------------------------------------
-// WP-2: Loop hardening — teardown (Finding F) & cost emission (Finding G)
+// WP-2: Loop hardening — cost emission (Finding G)
 // ---------------------------------------------------------------------------
-
-describe("WP-2 — sandbox teardown wired through deps (Finding F)", () => {
-  it("defaultDeps wires destroySandbox to the real destroyInteraction", () => {
-    const deps = defaultDeps();
-    expect(deps.destroySandbox).toBeDefined();
-    expect(typeof deps.destroySandbox).toBe("function");
-  });
-
-  it("destroySandbox is called when the loop runs (mock assertion)", async () => {
-    const destroyMock = vi.fn(async (_envId: string) => {});
-    const deps = makeDeps({ destroySandbox: destroyMock });
-
-    // The loop calls deps.audit twice (weak + strong re-audit).
-    // Our mock audit does NOT call destroySandbox directly — that's done in
-    // defaultDeps().audit. This test just proves the deps slot exists and
-    // can be mocked, which is sufficient for the integration contract.
-    const { events, emit } = collect();
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
-
-    // We proved the loop completed with the destroySandbox dep wired.
-    // The real teardown call is tested in antigravity.test.ts (destroyInteraction unit).
-    expect(events.some((e) => e.type === "pair_committed")).toBe(true);
-  });
-
-  it("loop still completes when destroySandbox is absent", async () => {
-    // destroySandbox is optional — loop must work without it
-    const deps = makeDeps({ destroySandbox: undefined });
-    const { events, emit } = collect();
-    await runVisualLoop(cfg({ max_pairs: 1 }), emit, deps);
-    expect(events.some((e) => e.type === "pair_committed")).toBe(true);
-  });
-});
 
 describe("WP-2 — cost emission contract (Finding G)", () => {
   it("training_event carries optional cost_microcents (schema check)", () => {
@@ -458,27 +424,7 @@ describe("WP-2 — cost emission contract (Finding G)", () => {
 
   it("existing Prime training handoff tests validate training_event flow", () => {
     // The 'Prime training handoff' describe block above already tests
-    // training_event emission end-to-end. The cost_microcents field is
-    // validated by the schema + the computeCostMicrocents unit tests in
-    // antigravity.test.ts.
+    // training_event emission end-to-end.
     expect(true).toBe(true);
-  });
-});
-
-describe("buildChallengerPrompt — intent steering (Feature A)", () => {
-  it("is unchanged when no intent fields are set", () => {
-    const p = buildChallengerPrompt(GenerationConfigSchema.parse({}));
-    expect(p).not.toMatch(/Target domain:/);
-    expect(p).not.toMatch(/framework/i);
-  });
-  it("injects domain_framing and framework when present", () => {
-    const p = buildChallengerPrompt(
-      GenerationConfigSchema.parse({
-        domain_framing: "React dashboards",
-        framework: "react",
-      }),
-    );
-    expect(p).toMatch(/Target domain: React dashboards/);
-    expect(p).toMatch(/react framework/);
   });
 });

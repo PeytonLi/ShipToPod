@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose'
 import type { PersistedEvent } from '../types'
-import type { AgentEvent } from '@brickbybrick/core'
+import type { AgentEvent } from '@shiptopod/core'
 
 const EventSchema = new Schema<PersistedEvent>({
   runId: { type: String, required: true },

@@ -1,22 +1,23 @@
 "use client";
 
-import type { AgentEvent } from "@brickbybrick/core";
+import type { AgentEvent } from "@shiptopod/core";
 
 import { decodeAgentEventMessage, splitSSEFrames } from "./sse";
 
 export interface StreamAgentEventsOptions {
-  url: string;
+  endpoint?: string;
   init?: RequestInit;
   signal?: AbortSignal;
   onEvent: (event: AgentEvent) => void;
 }
 
 export async function streamAgentEvents({
-  url,
+  endpoint = "/api/agent/code-loop/stream",
   init,
   signal,
   onEvent,
 }: StreamAgentEventsOptions): Promise<void> {
+  const url = endpoint;
   const response = await fetch(url, {
     ...init,
     signal,

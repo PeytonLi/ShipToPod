@@ -6,7 +6,7 @@ const PairSchema = new Schema<PersistedPair>({
   runId: { type: String, index: true, required: true },
   task: { type: Schema.Types.Mixed, required: true },
   weak_code: { type: String, required: true },
-  defect: { type: Schema.Types.Mixed, required: true },
+  failure: { type: Schema.Types.Mixed, required: true },
   strong_code: { type: String, required: true },
   u_score: { type: Number, index: true, required: true },
   createdAt: { type: Date, default: Date.now },
@@ -14,16 +14,11 @@ const PairSchema = new Schema<PersistedPair>({
 
 interface PairModelStatics {
   byRun(runId: string): ReturnType<Model<PersistedPair>['find']>
-  byMechanism(mechanism: string): ReturnType<Model<PersistedPair>['find']>
   recent(limit?: number): ReturnType<Model<PersistedPair>['find']>
 }
 
 PairSchema.statics.byRun = function (runId: string) {
   return this.find({ runId })
-}
-
-PairSchema.statics.byMechanism = function (mechanism: string) {
-  return this.find({ 'task.target_mechanism': mechanism })
 }
 
 PairSchema.statics.recent = function (limit = 10) {

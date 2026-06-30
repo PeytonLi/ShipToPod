@@ -5,16 +5,27 @@ import { createAgentEventHandler, decodeAgentEventMessage, splitSSEFrames } from
 describe('SSE AgentEvent decoding', () => {
   it('decodes JSON EventSource payloads through the frozen schema', () => {
     const event = decodeAgentEventMessage(
-      JSON.stringify({ type: 'narration', text: 'Visual audit is live.' }),
+      JSON.stringify({ type: 'challenge_generated', task: { id: 't1', prompt: 'test', language: 'python', hidden_tests: '' } }),
     )
 
-    expect(event).toEqual({ type: 'narration', text: 'Visual audit is live.' })
+    expect(event.type).toBe('challenge_generated')
   })
 
   it('decodes data-prefixed SSE frames', () => {
-    const event = decodeAgentEventMessage('data: {"type":"audit_pass"}')
+    const event = decodeAgentEventMessage('data: {"type":"pair_committed","pair":{"id":"p1","task":{"id":"t1","prompt":"p","language":"python","hidden_tests":""},"weak_code":"w","strong_code":"s","u_score":0.5,"failure":{"test_name":"t","message":"m","language":"python","code":"w"}},"u_score":0.5}')
 
-    expect(event).toEqual({ type: 'audit_pass' })
+    expect(event).toEqual({
+      type: 'pair_committed',
+      pair: {
+        id: 'p1',
+        task: { id: 't1', prompt: 'p', language: 'python', hidden_tests: '' },
+        weak_code: 'w',
+        strong_code: 's',
+        u_score: 0.5,
+        failure: { test_name: 't', message: 'm', language: 'python', code: 'w' },
+      },
+      u_score: 0.5,
+    })
   })
 
   it('surfaces invalid payloads to the handler error callback', () => {
@@ -30,10 +41,10 @@ describe('SSE AgentEvent decoding', () => {
 
   it('splits streaming SSE frames and keeps incomplete data buffered', () => {
     const { frames, rest } = splitSSEFrames(
-      'data: {"type":"audit_pass"}\n\ndata: {"type":"narration","text":"partial"',
+      'data: {"type":"pair_committed","pair":{"id":"p1","task":{"id":"t1","prompt":"p","language":"python","hidden_tests":""},"weak_code":"w","strong_code":"s","u_score":0.5,"failure":{"test_name":"t","message":"m","language":"python","code":"w"}},"u_score":0.5}\n\ndata: {"type":"weak_run_result","result":{"passed":false,"tests_passed":[],"tests_failed":[],"stdout":"","stderr":"","error":"partial',
     )
 
-    expect(frames).toEqual(['data: {"type":"audit_pass"}'])
-    expect(rest).toBe('data: {"type":"narration","text":"partial"')
+    expect(frames).toEqual(['data: {"type":"pair_committed","pair":{"id":"p1","task":{"id":"t1","prompt":"p","language":"python","hidden_tests":""},"weak_code":"w","strong_code":"s","u_score":0.5,"failure":{"test_name":"t","message":"m","language":"python","code":"w"}},"u_score":0.5}'])
+    expect(rest).toBe('data: {"type":"weak_run_result","result":{"passed":false,"tests_passed":[],"tests_failed":[],"stdout":"","stderr":"","error":"partial')
   })
 })

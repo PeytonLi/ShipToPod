@@ -4,25 +4,21 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   AgentEvent,
   AgentEventType,
-  AuditStep,
-  Defect,
+  CodeTask,
   EvalReport,
   EvalTaskResult,
   GenerationConfig,
   LossPoint,
   PairRejectReason,
+  RunResult,
   TrainingPair,
   TrainingSnapshot,
   TrainingStatus,
-  VisualTask,
-} from "@brickbybrick/core";
+} from "@shiptopod/core";
 
 export type LoopStatus =
   | "idle"
   | "running"
-  | "auditing"
-  | "fixing"
-  | "passed"
   | "committed"
   | "rejected"
   | "training";
@@ -40,19 +36,17 @@ export interface TimelineEntry {
 export interface AgentStoreSnapshot {
   status: LoopStatus;
   targetPairs: number;
-  currentTask: VisualTask | null;
+  currentTask: CodeTask | null;
   weakCode: string | null;
   strongCode: string | null;
   latestDiff: string | null;
-  latestAuditStep: AuditStep | null;
-  latestScreenshotSrc: string | null;
-  latestDefect: Defect | null;
+  latestWeakRunResult: RunResult | null;
+  latestStrongRunResult: RunResult | null;
   committedPairs: TrainingPair[];
   committedCount: number;
   uScore: number | null;
   lastRejectedReason: PairRejectReason | null;
   recipePatch: Partial<GenerationConfig> | null;
-  narration: string[];
   training: TrainingSnapshot;
   trainingRunId: string | null;
   timeline: TimelineEntry[];
@@ -76,7 +70,6 @@ interface AgentStoreActions {
 export type AgentStore = AgentStoreSnapshot & AgentStoreActions;
 
 const MAX_TIMELINE = 24;
-const MAX_NARRATION = 8;
 
 export const initialTrainingState: TrainingSnapshot = {
   status: "provisioning",
@@ -92,15 +85,13 @@ export const initialAgentState: AgentStoreSnapshot = {
   weakCode: null,
   strongCode: null,
   latestDiff: null,
-  latestAuditStep: null,
-  latestScreenshotSrc: null,
-  latestDefect: null,
+  latestWeakRunResult: null,
+  latestStrongRunResult: null,
   committedPairs: [],
   committedCount: 0,
   uScore: null,
   lastRejectedReason: null,
   recipePatch: null,
-  narration: [],
   training: initialTrainingState,
   trainingRunId: null,
   timeline: [],
@@ -114,34 +105,28 @@ export const initialAgentState: AgentStoreSnapshot = {
   evalReport: null,
 };
 
-function screenshotSrc(base64: string): string {
-  return base64.startsWith("data:")
-    ? base64
-    : `data:image/png;base64,${base64}`;
-}
-
 function eventLabel(event: AgentEvent): string {
   switch (event.type) {
     case "challenge_generated":
-      return `Challenge: ${event.task.target_mechanism}`;
+      return `Challenge: ${event.task.prompt.slice(0, 60)}`;
     case "weak_code_drafted":
-      return "Weak solver draft received";
-    case "audit_step":
-      return `Audit ${event.step.action}: ${event.step.intent}`;
-    case "defect_found":
-      return `Defect: ${event.defect.category}`;
+      return "Student draft received";
+    case "weak_run_result":
+      return event.result.passed
+        ? "Student code passed (too easy)"
+        : `Student run: ${event.result.tests_failed.length} failures`;
     case "strong_fix_generated":
-      return "Strong solver fix generated";
-    case "audit_pass":
-      return "Visual audit passed";
+      return "Teacher fix generated";
+    case "strong_run_result":
+      return event.result.passed
+        ? `Strong run passed (${event.result.tests_passed.length} tests)`
+        : "Strong run still failing";
     case "pair_committed":
       return `Pair committed, U=${event.u_score.toFixed(2)}`;
     case "pair_rejected":
       return `Pair rejected: ${event.reason.replace("_", " ")}`;
     case "recipe_mutated":
       return "Recipe mutated";
-    case "narration":
-      return event.text;
     case "training_event":
       return event.status
         ? `Training: ${event.status}`
@@ -157,22 +142,19 @@ function eventLabel(event: AgentEvent): string {
     case "eval_complete":
       return "Evaluation complete";
   }
-  // Exhaustive — all event types handled above.
   return (event as { type: string }).type;
 }
 
 function eventTone(event: AgentEvent): TimelineEntry["tone"] {
   switch (event.type) {
     case "pair_committed":
-    case "audit_pass":
       return "success";
     case "pair_rejected":
       return "warning";
-    case "defect_found":
-      return event.defect.severity === "critical" ||
-        event.defect.severity === "high"
-        ? "error"
-        : "warning";
+    case "weak_run_result":
+      return event.result.passed ? "warning" : "neutral";
+    case "strong_run_result":
+      return event.result.passed ? "success" : "error";
     default:
       return "neutral";
   }
@@ -223,34 +205,31 @@ export function reduceAgentState(
         ...base,
         status: "running",
         currentTask: event.task,
-        latestDefect: null,
+        latestWeakRunResult: null,
+        latestStrongRunResult: null,
         lastRejectedReason: null,
       };
     case "weak_code_drafted":
       return { ...base, status: "running", weakCode: event.code };
-    case "audit_step":
+    case "weak_run_result":
       return {
         ...base,
-        status: "auditing",
-        latestAuditStep: event.step,
-        latestScreenshotSrc: screenshotSrc(event.step.screenshot),
-      };
-    case "defect_found":
-      return {
-        ...base,
-        status: "auditing",
-        latestDefect: event.defect,
-        latestScreenshotSrc: screenshotSrc(event.defect.screenshot),
+        status: "running",
+        latestWeakRunResult: event.result,
       };
     case "strong_fix_generated":
       return {
         ...base,
-        status: "fixing",
+        status: "running",
         strongCode: event.code,
         latestDiff: event.diff,
       };
-    case "audit_pass":
-      return { ...base, status: "passed" };
+    case "strong_run_result":
+      return {
+        ...base,
+        status: "running",
+        latestStrongRunResult: event.result,
+      };
     case "pair_committed":
       return {
         ...base,
@@ -270,11 +249,6 @@ export function reduceAgentState(
       };
     case "recipe_mutated":
       return { ...base, recipePatch: event.patch };
-    case "narration":
-      return {
-        ...base,
-        narration: [event.text, ...state.narration].slice(0, MAX_NARRATION),
-      };
     case "training_event":
       return {
         ...base,
@@ -304,6 +278,8 @@ export function reduceAgentState(
     case "eval_complete":
       return { ...base, evalRunning: false, evalReport: event.report };
   }
+  // Exhaustive — all event types handled above.
+  return base;
 }
 
 function persistedSnapshot(state: AgentStore): AgentStoreSnapshot {
@@ -314,15 +290,13 @@ function persistedSnapshot(state: AgentStore): AgentStoreSnapshot {
     weakCode: state.weakCode,
     strongCode: state.strongCode,
     latestDiff: state.latestDiff,
-    latestAuditStep: state.latestAuditStep,
-    latestScreenshotSrc: state.latestScreenshotSrc,
-    latestDefect: state.latestDefect,
+    latestWeakRunResult: state.latestWeakRunResult,
+    latestStrongRunResult: state.latestStrongRunResult,
     committedPairs: state.committedPairs,
     committedCount: state.committedCount,
     uScore: state.uScore,
     lastRejectedReason: state.lastRejectedReason,
     recipePatch: state.recipePatch,
-    narration: state.narration,
     training: state.training,
     trainingRunId: state.trainingRunId,
     timeline: state.timeline,
@@ -348,7 +322,7 @@ export const useAgentStore = create<AgentStore>()(
       clearPulse: () => set({ pulse: null }),
     }),
     {
-      name: "brickbybrick-agent",
+      name: "shiptopod-agent",
       storage: createJSONStorage(() => sessionStorage),
       partialize: persistedSnapshot,
     },

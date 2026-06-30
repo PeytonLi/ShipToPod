@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { exportDataset } from "./dataset";
-import { TrainingPairSchema } from "@brickbybrick/core";
-import type { TrainingPair } from "@brickbybrick/core";
+import { TrainingPairSchema } from "@shiptopod/core";
+import type { TrainingPair } from "@shiptopod/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -11,15 +11,15 @@ function makePair(overrides: Partial<TrainingPair> = {}): TrainingPair {
     task: {
       id: "task-1",
       prompt: "Build a responsive grid",
-      target_mechanism: "responsive-grid",
-      criteria: [{ id: "c1", description: "No overflow", weight: 1 }],
+      language: "python",
+      hidden_tests: "def test_grid(): pass",
     },
     weak_code: "function Grid() { return <div>bad</div> }",
-    defect: {
-      screenshot: "base64fake",
-      dom_trace: "Error: overflow",
-      category: "overflow",
-      severity: "high",
+    failure: {
+      test_name: "test_grid_overflow",
+      message: "Error: overflow",
+      language: "python",
+      code: "function Grid() { return <div>bad</div> }",
     },
     strong_code:
       'function Grid() { return <div style={{overflow:"hidden"}}>good</div> }',
@@ -48,7 +48,7 @@ describe("exportDataset", () => {
     expect(parsed.id).toBe("pair-1");
     expect(parsed.task.id).toBe("task-1");
     expect(parsed.weak_code).toBe(pair.weak_code);
-    expect(parsed.defect.category).toBe("overflow");
+    expect(parsed.failure.test_name).toBe("test_grid_overflow");
     expect(parsed.strong_code).toBe(pair.strong_code);
     expect(parsed.u_score).toBe(0.72);
   });
@@ -110,7 +110,10 @@ describe("seed dataset validation", () => {
       const result = TrainingPairSchema.safeParse(obj);
       if (!result.success) {
         const issues = result.error.issues
-          .map((iss) => `${iss.path.join(".")}: ${iss.message}`)
+          .map(
+            (iss: { path: (string | number)[]; message: string }) =>
+              `${iss.path.join(".")}: ${iss.message}`,
+          )
           .join("; ");
         throw new Error(`Row ${i + 1} (id: ${obj.id || "unknown"}): ${issues}`);
       }
@@ -128,31 +131,12 @@ describe("seed dataset validation", () => {
     }
   });
 
-  it("all defect categories are valid", () => {
-    const validCats = [
-      "layout_collision",
-      "overflow",
-      "truncation",
-      "offscreen_render",
-      "frozen_state",
-      "script_error",
-      "other",
-    ];
+  it("all failure test_names are present", () => {
     const raw = fs.readFileSync(fixturePath, "utf-8");
     const lines = raw.trim().split("\n");
     for (const line of lines) {
       const obj = JSON.parse(line);
-      expect(validCats).toContain(obj.defect.category);
-    }
-  });
-
-  it("all severities are valid", () => {
-    const validSevs = ["low", "medium", "high", "critical"];
-    const raw = fs.readFileSync(fixturePath, "utf-8");
-    const lines = raw.trim().split("\n");
-    for (const line of lines) {
-      const obj = JSON.parse(line);
-      expect(validSevs).toContain(obj.defect.severity);
+      expect(obj.failure.test_name).toBeTruthy();
     }
   });
 
@@ -165,10 +149,10 @@ describe("seed dataset validation", () => {
       expect(obj.task).toBeTruthy();
       expect(obj.task.id).toBeTruthy();
       expect(obj.task.prompt).toBeTruthy();
-      expect(obj.task.target_mechanism).toBeTruthy();
-      expect(obj.task.criteria).toBeTruthy();
+      expect(obj.task.language).toBeTruthy();
+      expect(obj.task.hidden_tests).toBeTruthy();
       expect(obj.weak_code).toBeTruthy();
-      expect(obj.defect).toBeTruthy();
+      expect(obj.failure).toBeTruthy();
       expect(obj.strong_code).toBeTruthy();
       expect(typeof obj.u_score).toBe("number");
     }

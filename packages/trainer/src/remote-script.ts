@@ -1,4 +1,4 @@
-export const GEMMA_LORA_TRAINER_PY = String.raw`#!/usr/bin/env python3
+export const LORA_TRAINER_PY = String.raw`#!/usr/bin/env python3
 import argparse
 import json
 import math
@@ -36,7 +36,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--model", default="google/gemma-4-26B-A4B-it")
+    parser.add_argument("--model", default="deepseek-ai/deepseek-coder-1.3b-instruct")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--learning-rate", type=float, default=5e-5)
@@ -49,7 +49,7 @@ def parse_args():
 
 
 def format_chat(example, tokenizer):
-    """Convert a {messages: [...]} row into Gemma's instruction-following text."""
+    """Convert a {messages: [...]} row into DeepSeek-Coder's instruction-following text."""
     return tokenizer.apply_chat_template(example["messages"], tokenize=False, add_generation_prompt=False)
 
 
@@ -75,9 +75,9 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Warn if the tokenizer doesn't have a chat template (Gemma should, but be safe)
+    # Warn if the tokenizer doesn't have a chat template (DeepSeek-Coder should, but be safe)
     if not hasattr(tokenizer, "chat_template") or tokenizer.chat_template is None:
-        print(json.dumps({"type": "error", "message": "Tokenizer lacks a chat_template. Gemma models must have one for conversation formatting."}), flush=True)
+        print(json.dumps({"type": "error", "message": "Tokenizer lacks a chat_template. DeepSeek-Coder models must have one for conversation formatting."}), flush=True)
         sys.exit(1)
 
     quantization = BitsAndBytesConfig(
@@ -181,5 +181,8 @@ if __name__ == "__main__":
         main()
     except Exception as exc:
         print(json.dumps({"type": "error", "message": str(exc)}), flush=True)
-        raise
-`;
+            raise
+    `;
+
+    // Backward-compat alias
+    export const GEMMA_LORA_TRAINER_PY = LORA_TRAINER_PY;

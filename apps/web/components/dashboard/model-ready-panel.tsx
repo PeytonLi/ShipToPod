@@ -19,14 +19,18 @@ export function ModelReadyPanel() {
   async function runEval() {
     if (!trainingRunId) return;
     await streamAgentEvents({
-      url: "/api/eval/stream",
-      init: { method: "POST", body: JSON.stringify({ runId: trainingRunId, k: 3 }) },
+      endpoint: "/api/eval/stream",
+      init: {
+        method: "POST",
+        body: JSON.stringify({ runId: trainingRunId, k: 3 }),
+      },
       onEvent: consumeEvent,
     });
   }
   async function tryIt(model: "base" | "tuned") {
     const res = await fetch("/api/model/infer", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ runId: trainingRunId, prompt, model }),
     });
     const { code } = (await res.json()) as { code: string };
@@ -36,17 +40,28 @@ export function ModelReadyPanel() {
   return (
     <section className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.03] p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-white">Model ready</h3>
-        <span className="text-xs text-zinc-400">serve expires {new Date(serveInfo.expiresAt).toLocaleTimeString()}</span>
+        <div>
+          <h3 className="text-sm font-medium text-white">
+            Model serving — ready
+          </h3>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Base: {serveInfo.baseModel} · URL: {serveInfo.url}
+          </p>
+        </div>
+        <span className="text-xs text-zinc-400">
+          Expires {new Date(serveInfo.expiresAt).toLocaleTimeString()}
+        </span>
       </div>
       <div className="mt-3 flex gap-2">
         <Button onClick={runEval} disabled={evalRunning}>
-          {evalRunning ? "Evaluating…" : "Run before/after eval (≈6 audits)"}
+          {evalRunning ? "Evaluating…" : "Run eval (≈6 code tasks)"}
         </Button>
       </div>
       {evalReport ? (
         <div className="mt-3 text-sm text-zinc-200">
-          Tuned vs base: <span className="text-emerald-400">{evalReport.wins}W</span> / {evalReport.ties}T /{" "}
+          Tuned vs base:{" "}
+          <span className="text-emerald-400">{evalReport.wins}W</span> /{" "}
+          {evalReport.ties}T /{" "}
           <span className="text-rose-400">{evalReport.losses}L</span> · Δscore{" "}
           {evalReport.mean_score_delta.toFixed(3)}
         </div>
@@ -59,12 +74,24 @@ export function ModelReadyPanel() {
           onChange={(e) => setPrompt(e.target.value)}
         />
         <div className="mt-2 flex gap-2">
-          <Button variant="secondary" onClick={() => tryIt("base")} disabled={!prompt.trim()}>Base</Button>
-          <Button onClick={() => tryIt("tuned")} disabled={!prompt.trim()}>Tuned</Button>
+          <Button
+            variant="secondary"
+            onClick={() => tryIt("base")}
+            disabled={!prompt.trim()}
+          >
+            Base
+          </Button>
+          <Button onClick={() => tryIt("tuned")} disabled={!prompt.trim()}>
+            Tuned
+          </Button>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <pre className="max-h-48 overflow-auto rounded bg-black/60 p-2 text-xs text-zinc-300">{base ?? "base output…"}</pre>
-          <pre className="max-h-48 overflow-auto rounded bg-black/60 p-2 text-xs text-zinc-300">{tuned ?? "tuned output…"}</pre>
+          <pre className="max-h-48 overflow-auto rounded bg-black/60 p-2 text-xs text-zinc-300">
+            {base ?? "base output…"}
+          </pre>
+          <pre className="max-h-48 overflow-auto rounded bg-black/60 p-2 text-xs text-zinc-300">
+            {tuned ?? "tuned output…"}
+          </pre>
         </div>
       </div>
     </section>

@@ -23,7 +23,7 @@ function loadEnv(): Record<string, string> {
       if (m) env[m[1]] = m[2].trim();
     }
   }
-  return { ...env, ...process.env as Record<string, string> };
+  return { ...env, ...(process.env as Record<string, string>) };
 }
 
 function run(cmd: string, args: string[]): string {
@@ -42,15 +42,23 @@ async function main() {
   const hfToken = env.HF_TOKEN;
   if (!hfToken) throw new Error("HF_TOKEN required");
 
-  const runName = `bbb-detached-${Date.now()}`;
-  const modelId = env.BBB_GEMMA_MODEL ?? "google/gemma-4-26B-A4B-it";
+  const runName = `stp-detached-${Date.now()}`;
+  const modelId =
+    env.BBB_BASE_MODEL ?? "deepseek-ai/deepseek-coder-1.3b-instruct";
   const epochs = Number(env.BBB_TRAINING_EPOCHS ?? 3);
   const hubRepo = env.BBB_HF_HUB_REPO?.trim() || undefined;
 
   // 1. Provision pod
   console.log("[1/5] Provisioning H100 pod...");
   const gpuId = env.PRIME_GPU_ID;
-  const provisionArgs = ["--plain", "pods", "create", "--name", runName, "--yes"];
+  const provisionArgs = [
+    "--plain",
+    "pods",
+    "create",
+    "--name",
+    runName,
+    "--yes",
+  ];
   if (gpuId) provisionArgs.push("--id", gpuId);
   const provOut = run("prime", provisionArgs);
   const podMatch = provOut.match(/Successfully created pod ([a-f0-9]+)/);
@@ -60,11 +68,13 @@ async function main() {
 
   // 2. Wait for SSH
   console.log("[2/5] Waiting for SSH...");
-  const keyPath = env.PRIME_SSH_KEY_PATH?.replace(/\/g, "/") ?? "";
+  const keyPath = env.PRIME_SSH_KEY_PATH?.replace(/\\/g, "/") ?? "";
   for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 10_000));
+    await new Promise((r) => setTimeout(r, 10_000));
     try {
-      const status = JSON.parse(run("prime", ["--plain", "pods", "get", podId, "--output", "json"]));
+      const status = JSON.parse(
+        run("prime", ["--plain", "pods", "get", podId, "--output", "json"]),
+      );
       if (status.status === "ACTIVE" && status.ssh) {
         const parts = status.ssh.split(" ");
         const host = parts[0];
@@ -80,33 +90,75 @@ async function main() {
 
         // Build scp args
         const scpBase = keyPath ? ["-i", keyPath] : [];
-        const fixturePath = path.join(import.meta.dirname, "..", "..", "packages", "trainer", "__fixtures__", "demo-dataset.jsonl");
-        const scriptPath = path.join(import.meta.dirname, "..", "..", "packages", "trainer", "src", "remote-script.ts");
+        const fixturePath = path.join(
+          import.meta.dirname,
+          "..",
+          "..",
+          "packages",
+          "trainer",
+          "__fixtures__",
+          "demo-dataset.jsonl",
+        );
+        const scriptPath = path.join(
+          import.meta.dirname,
+          "..",
+          "..",
+          "packages",
+          "trainer",
+          "src",
+          "remote-script.ts",
+        );
         const shellPath = path.join(import.meta.dirname, "pod-train.sh");
 
-        run("scp", [...scpBase, fixturePath, `root@${host.split("@").pop()}:${remoteDir}/dataset.jsonl`]);
-        // We need the actual .py trainer, not the TS wrapper. Use the GEMMA_LORA_TRAINER_PY export
-        // For now, we'll extract it from the built module
-        const { GEMMA_LORA_TRAINER_PY } = await import("@brickbybrick/trainer/src/remote-script");
-        fs.writeFileSync(path.join(import.meta.dirname, "train_gemma_lora.py"), GEMMA_LORA_TRAINER_PY);
-        run("scp", [...scpBase, path.join(import.meta.dirname, "train_gemma_lora.py"), `root@${host.split("@").pop()}:${remoteDir}/train_gemma_lora.py`]);
-        run("scp", [...scpBase, shellPath, `root@${host.split("@").pop()}:${remoteDir}/pod-train.sh`]);
+        run("scp", [
+          ...scpBase,
+          fixturePath,
+          `root@${host.split("@").pop()}:${remoteDir}/dataset.jsonl`,
+        ]);
+        // We need the actual .py trainer, not the TS wrapper. Use the LORA_TRAINER_PY export
+        // (now based on DeepSeek-Coder, not Gemma)
+        const { LORA_TRAINER_PY } =
+          await import("@shiptopod/trainer/src/remote-script");
+        fs.writeFileSync(
+          path.join(import.meta.dirname, "train_lora.py"),
+          LORA_TRAINER_PY,
+        );
+        run("scp", [
+          ...scpBase,
+          path.join(import.meta.dirname, "train_lora.py"),
+          `root@${host.split("@").pop()}:${remoteDir}/train_lora.py`,
+        ]);
+        run("scp", [
+          ...scpBase,
+          shellPath,
+          `root@${host.split("@").pop()}:${remoteDir}/pod-train.sh`,
+        ]);
 
         // 4. Launch detached training
         console.log("[4/5] Launching training (detached)...");
         const hubArg = hubRepo ? `'${hubRepo}'` : `''`;
-        run("ssh", [...sshBase, target, `bash ${remoteDir}/pod-train.sh ${remoteDir} '${hfToken}' '${modelId}' ${epochs} ${hubArg}`]);
+        run("ssh", [
+          ...sshBase,
+          target,
+          `bash ${remoteDir}/pod-train.sh ${remoteDir} '${hfToken}' '${modelId}' ${epochs} ${hubArg}`,
+        ]);
 
         // 5. Poll for metrics
         console.log("[5/5] Polling for training progress...\n");
-        const metricsStream = fs.createWriteStream(METRICS_PATH, { flags: "w" });
+        const metricsStream = fs.createWriteStream(METRICS_PATH, {
+          flags: "w",
+        });
         let lastStep = -1;
         let trainingDone = false;
 
         while (!trainingDone) {
-          await new Promise(r => setTimeout(r, 30_000));
+          await new Promise((r) => setTimeout(r, 30_000));
           try {
-            const logTail = run("ssh", [...sshBase, target, `tail -3 ${remoteDir}/training.log 2>/dev/null || echo ""`]);
+            const logTail = run("ssh", [
+              ...sshBase,
+              target,
+              `tail -3 ${remoteDir}/training.log 2>/dev/null || echo ""`,
+            ]);
             const lines = logTail.trim().split("\n").filter(Boolean);
 
             for (const line of lines) {
@@ -114,10 +166,16 @@ async function main() {
                 const parsed = JSON.parse(line.trim());
                 if (parsed.type === "metric" && parsed.step > lastStep) {
                   lastStep = parsed.step;
-                  const point = { step: parsed.step, loss: parsed.loss, epoch: parsed.epoch ?? 0 };
+                  const point = {
+                    step: parsed.step,
+                    loss: parsed.loss,
+                    epoch: parsed.epoch ?? 0,
+                  };
                   metricsStream.write(JSON.stringify(point) + "\n");
                   const delta = lastStep > 1 ? "" : "";
-                  console.log(`  [step ${String(point.step).padStart(4)}] loss=${point.loss.toFixed(4)}  epoch=${point.epoch.toFixed(2)}`);
+                  console.log(
+                    `  [step ${String(point.step).padStart(4)}] loss=${point.loss.toFixed(4)}  epoch=${point.epoch.toFixed(2)}`,
+                  );
                 }
                 if (parsed.type === "complete") {
                   trainingDone = true;
@@ -131,13 +189,21 @@ async function main() {
             }
 
             // Also check training status
-            const statusCheck = run("ssh", [...sshBase, target, `cat ${remoteDir}/train.pid 2>/dev/null || echo "NO_PID"`]);
+            const statusCheck = run("ssh", [
+              ...sshBase,
+              target,
+              `cat ${remoteDir}/train.pid 2>/dev/null || echo "NO_PID"`,
+            ]);
             if (statusCheck.includes("NO_PID")) {
               trainingDone = true;
             } else {
               const pid = statusCheck.match(/TRAIN_PID=(\d+)/)?.[1];
               if (pid) {
-                const alive = run("ssh", [...sshBase, target, `kill -0 ${pid} 2>/dev/null && echo ALIVE || echo DEAD`]).trim();
+                const alive = run("ssh", [
+                  ...sshBase,
+                  target,
+                  `kill -0 ${pid} 2>/dev/null && echo ALIVE || echo DEAD`,
+                ]).trim();
                 if (alive === "DEAD") {
                   trainingDone = true;
                   console.log("  Training process exited.");
@@ -151,8 +217,12 @@ async function main() {
 
         metricsStream.end();
         console.log(`\nMetrics saved to: ${METRICS_PATH}`);
-        console.log(`Pod ${podId} still active. adapter at: ${remoteDir}/adapter`);
-        console.log("Run: prime pods terminate " + podId + " --yes  to clean up");
+        console.log(
+          `Pod ${podId} still active. adapter at: ${remoteDir}/adapter`,
+        );
+        console.log(
+          "Run: prime pods terminate " + podId + " --yes  to clean up",
+        );
         return;
       }
     } catch {}
@@ -161,6 +231,9 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Training failed:", error instanceof Error ? error.message : error);
+  console.error(
+    "Training failed:",
+    error instanceof Error ? error.message : error,
+  );
   process.exit(1);
 });

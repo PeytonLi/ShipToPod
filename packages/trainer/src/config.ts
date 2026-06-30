@@ -6,10 +6,12 @@ export interface TrainingConfigOpts {
   epochs?: number;
   batch_size?: number;
   lr?: number;
+  /** HuggingFace repo to push the adapter to */
+  hub_repo?: string;
 }
 
 export function buildTrainingConfig(opts: TrainingConfigOpts = {}): string {
-  const base_model = opts.base_model ?? "google/gemma-4-26B-A4B-it";
+  const base_model = opts.base_model ?? "deepseek-ai/deepseek-coder-1.3b-instruct";
   const lora_rank = opts.lora_rank ?? 16;
   const lora_alpha = opts.lora_alpha ?? 32;
   const target_modules = opts.lora_target_modules ?? [
@@ -24,7 +26,7 @@ export function buildTrainingConfig(opts: TrainingConfigOpts = {}): string {
 
   const modulesToml = target_modules.map((m) => `"${m}"`).join(", ");
 
-  return [
+  const lines = [
     "[model]",
     `base = "${base_model}"`,
     "",
@@ -37,6 +39,11 @@ export function buildTrainingConfig(opts: TrainingConfigOpts = {}): string {
     `epochs = ${epochs}`,
     `batch_size = ${batch_size}`,
     `lr = ${lr}`,
-    "",
-  ].join("\n");
+  ];
+
+  if (opts.hub_repo) {
+    lines.push("", "[hub]", `repo = "${opts.hub_repo}"`);
+  }
+
+  return lines.join("\n") + "\n";
 }

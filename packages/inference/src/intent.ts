@@ -1,6 +1,6 @@
 // packages/inference/src/intent.ts
-import { GenerationConfigSchema, type GenerationConfig } from '@brickbybrick/core'
-import { generateContent, STRONG_MODEL, stripCodeFences, type RetryOptions } from './gemini'
+import { GenerationConfigSchema, type GenerationConfig } from '@shiptopod/core'
+import { deepseekChat, stripCodeFences, type RetryOptions } from './deepseek'
 import { INTENT_EXPANDER_SYSTEM } from './prompts'
 
 export interface ExpandedIntent {
@@ -35,15 +35,14 @@ export async function expandIntent(
   const text = intent.trim()
   if (!text) throw new Error('intent is empty')
 
-  const raw = await generateContent(STRONG_MODEL(), INTENT_EXPANDER_SYSTEM, text, opts)
+  const raw = await deepseekChat(INTENT_EXPANDER_SYSTEM, text, opts)
   const obj = parseJsonObject(raw)
 
   const config = GenerationConfigSchema.partial().parse({
     intent: text,
     domain_framing: typeof obj.domain_framing === 'string' ? obj.domain_framing : undefined,
-    framework: typeof obj.framework === 'string' ? obj.framework : undefined,
     challenger_weights: isWeightRecord(obj.challenger_weights) ? obj.challenger_weights : undefined,
-    focus_mechanism: typeof obj.focus_mechanism === 'string' ? obj.focus_mechanism : undefined,
+    focus_language: obj.focus_language === 'python' || obj.focus_language === 'sql' ? obj.focus_language : undefined,
   })
 
   const sample_titles = Array.isArray(obj.sample_titles)

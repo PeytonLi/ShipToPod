@@ -1,5 +1,11 @@
-import type { AgentEvent } from "@brickbybrick/core";
-import { demoTask } from "../agent/visual-loop/demo-runner";
+import type { AgentEvent, CodeTask } from "@shiptopod/core";
+
+const demoTask: CodeTask = {
+  id: "demo-python-fizzbuzz",
+  prompt: "Write a Python function fizzbuzz(n) that returns a list of strings.",
+  language: "python",
+  hidden_tests: "assert fizzbuzz(5) == ['1','2','Fizz','4','Buzz']",
+};
 
 export async function demoRunEval(
   runId: string,
@@ -12,10 +18,10 @@ export async function demoRunEval(
       type: "eval_task_result",
       result: {
         task: demoTask,
-        base_score: 0.4,
-        tuned_score: 0.8,
-        base_passed_criteria: ["action-visible"],
-        tuned_passed_criteria: ["no-horizontal-overflow", "action-visible"],
+        base_passed: 1,
+        base_total: 3,
+        tuned_passed: 3,
+        tuned_total: 3,
         winner: "tuned",
       },
     });
@@ -27,10 +33,9 @@ export async function demoRunEval(
       k,
       base_model: "gemma-base",
       tuned_model: "tuned",
-      wins: k,
-      ties: 0,
-      losses: 0,
-      mean_score_delta: 0.4,
+      base_pass_at_1: 0.33,
+      tuned_pass_at_1: 1.0,
+      delta: 0.67,
       tasks: [],
     },
   });

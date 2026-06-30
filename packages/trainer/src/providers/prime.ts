@@ -1,4 +1,4 @@
-import type { LossPoint } from '@brickbybrick/core'
+import type { LossPoint } from '@shiptopod/core'
 import type { ProvisionPodOpts } from '../prime'
 
 export interface PrimeTrainingDeps {

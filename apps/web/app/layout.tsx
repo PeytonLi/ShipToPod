@@ -8,8 +8,8 @@ import { Nav } from "@/components/nav";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "BrickByBrick",
-  description: "Closed-Loop Multi-Agent Data Synthesizer",
+  title: "ShipToPod",
+  description: "Backend-Code Fine-Tuning Factory",
 };
 
 export default function RootLayout({

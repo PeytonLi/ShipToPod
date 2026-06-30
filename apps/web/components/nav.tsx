@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
-  AudioLines,
+  Braces,
   Cpu,
   BarChart3,
   Layers,
@@ -27,7 +27,7 @@ const secondaryNav = [
     external: true,
   },
   {
-    href: "https://github.com/PeytonLi/BrickByBrick",
+    href: "https://github.com/PeytonLi/ShipToPod",
     label: "GitHub",
     icon: Terminal,
     external: true,
@@ -45,14 +45,14 @@ export function Nav() {
         className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-4"
       >
         <span className="flex size-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
-          <AudioLines className="size-4 text-emerald-400" aria-hidden="true" />
+          <Braces className="size-4 text-emerald-400" aria-hidden="true" />
         </span>
         <span>
           <span className="font-serif text-sm font-medium text-white">
-            BrickByBrick
+            ShipToPod
           </span>
           <span className="block text-[10px] uppercase tracking-widest text-zinc-600">
-            Data loop
+            Code factory
           </span>
         </span>
       </Link>

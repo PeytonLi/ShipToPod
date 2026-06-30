@@ -1,17 +1,11 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, memo } from "react";
-import Image from "next/image";
-import { useMemo } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
 import {
   Loader2,
   Play,
   Square,
   RefreshCw,
-  CircleDot,
-  ShieldCheck,
-  Mic2,
-  MicOff,
   Radio,
   Cpu,
   CheckCircle2,
@@ -20,16 +14,13 @@ import {
   TerminalSquare,
   ArrowRight,
   Zap,
-  Gauge,
   Sparkles,
-  Bot,
   GitCompareArrows,
   AlertTriangle,
   Search,
   Package,
   ExternalLink,
 } from "lucide-react";
-import { Tabs } from "@base-ui/react/tabs";
 import {
   Line,
   LineChart,
@@ -38,14 +29,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  useLocalParticipant,
-  useMultibandTrackVolume,
-  useTracks,
-} from "@livekit/components-react";
-import { Track } from "livekit-client";
 import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/components/ui/button";
@@ -58,128 +41,9 @@ import {
 } from "@/lib/store";
 import { streamAgentEvents } from "@/lib/stream-client";
 import { cn } from "@/lib/utils";
-
-interface LiveKitTokenPayload {
-  token: string;
-  url: string;
-}
+import { CodeTaskView } from "./adversarial-matrix";
 
 type StreamState = "idle" | "streaming" | "error";
-
-// ---------------------------------------------------------------------------
-// Mock HF model catalogue — replace with /api/hf/models once the endpoint
-// is built.  Pre-seeded with repos that match the rehearsal naming convention.
-// ---------------------------------------------------------------------------
-const MOCK_HF_REPOS: { id: string; label: string }[] = [
-  { id: "peytonali/gemma-bbb-lora", label: "peytonali/gemma-bbb-lora" },
-  {
-    id: "peytonali/bbb-rehearsal-1782650385176",
-    label: "peytonali/bbb-rehearsal-1782650385176",
-  },
-  {
-    id: "peytonali/bbb-rehearsal-1782649823102",
-    label: "peytonali/bbb-rehearsal-1782649823102",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Audio visualizer — 24-band bar display for LiveKit narration
-// ---------------------------------------------------------------------------
-function AgentAudioVisualizer({
-  connected = false,
-  levels = [],
-}: {
-  connected?: boolean;
-  levels?: number[];
-}) {
-  return (
-    <div
-      className={cn(
-        "grid h-24 grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-1 rounded-md border border-white/10 bg-zinc-950 p-3",
-        connected && "border-emerald-300/40",
-      )}
-      aria-label="Agent audio visualizer"
-    >
-      {Array.from({ length: 24 }, (_, index) => {
-        const level = levels[index] ?? 0;
-        const isAudible = connected && level > 0.015;
-
-        return (
-          <span
-            key={index}
-            className={cn(
-              "rounded-t bg-zinc-700 transition-[height,background-color,opacity]",
-              isAudible && "bg-emerald-300",
-            )}
-            style={{
-              height: connected
-                ? `${Math.max(10, Math.min(100, 10 + level * 90))}%`
-                : `${18 + ((index * 17) % 52)}%`,
-              opacity: connected
-                ? Math.max(0.35, Math.min(1, 0.35 + level * 1.8))
-                : 0.55,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-const MemoAgentAudioVisualizer = memo(AgentAudioVisualizer);
-
-// ---------------------------------------------------------------------------
-// Narration log — plain-language what's-happening feed
-// ---------------------------------------------------------------------------
-function NarrationLog({ narration }: { narration: string[] }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
-        <Radio className="size-3" aria-hidden="true" />
-        Narration
-      </div>
-      <div className="space-y-2">
-        {(narration.length > 0
-          ? narration
-          : ["Waiting for the first event…"]
-        ).map((line, index) => (
-          <p
-            key={`${line.slice(0, 32)}-${index}`}
-            className="text-xs leading-5 text-zinc-300"
-          >
-            {line}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Gap meter — horizontal bar showing U score (0–1), gradient amber → green
-// ---------------------------------------------------------------------------
-function GapMeter({ value }: { value: number }) {
-  const bounded = Math.min(1, Math.max(0, value));
-  return (
-    <div className="surface rounded-lg p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-white">
-          <Gauge className="size-4 text-emerald-300" aria-hidden="true" />
-          Gap score
-        </div>
-        <span className="font-mono text-sm text-zinc-300">
-          U = {bounded.toFixed(2)}
-        </span>
-      </div>
-      <div className="h-3 overflow-hidden rounded bg-zinc-800">
-        <div
-          className="h-full rounded bg-[linear-gradient(90deg,#f59e0b,#22c55e)] transition-[width] duration-700"
-          style={{ width: `${bounded * 100}%` }}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Training status timeline — provisioning → streaming → training → saving → complete
@@ -207,7 +71,7 @@ function TrainingTimeline({
         const complete = activeIndex >= 0 && index < activeIndex;
         const active = s === status;
         const label = trainingStatusLabel(
-          s as import("@brickbybrick/core").TrainingStatus,
+          s as Parameters<typeof trainingStatusLabel>[0],
         );
         return (
           <li
@@ -253,15 +117,13 @@ export function ControlCenter() {
       weakCode: s.weakCode,
       strongCode: s.strongCode,
       latestDiff: s.latestDiff,
-      latestAuditStep: s.latestAuditStep,
-      latestScreenshotSrc: s.latestScreenshotSrc,
-      latestDefect: s.latestDefect,
+      latestWeakRunResult: s.latestWeakRunResult,
+      latestStrongRunResult: s.latestStrongRunResult,
       committedPairs: s.committedPairs,
       committedCount: s.committedCount,
       uScore: s.uScore,
       lastRejectedReason: s.lastRejectedReason,
       recipePatch: s.recipePatch,
-      narration: s.narration,
       training: s.training,
       trainingRunId: s.trainingRunId,
       timeline: s.timeline,
@@ -269,6 +131,7 @@ export function ControlCenter() {
       pulse: s.pulse,
       serveInfo: s.serveInfo,
       evalRunning: s.evalRunning,
+      evalResults: s.evalResults,
       evalReport: s.evalReport,
       derivedConfig: s.derivedConfig,
       sampleTitles: s.sampleTitles,
@@ -282,15 +145,10 @@ export function ControlCenter() {
   // ── Local state ─────────────────────────────────────────────────────────
   const [intent, setIntent] = useState("");
   const [deriving, setDeriving] = useState(false);
-  const [visualState, setVisualState] = useState<StreamState>("idle");
+  const [codeLoopState, setCodeLoopState] = useState<StreamState>("idle");
   const [trainingState, setTrainingState] = useState<StreamState>("idle");
   const [manualRunId, setManualRunId] = useState("");
-  const [liveKitToken, setLiveKitToken] = useState<LiveKitTokenPayload | null>(
-    null,
-  );
-  const [liveKitError, setLiveKitError] = useState<string | null>(null);
-  const [micMuted, setMicMuted] = useState(false);
-  const visualAbortRef = useRef<AbortController | null>(null);
+  const codeLoopAbortRef = useRef<AbortController | null>(null);
   const trainingAbortRef = useRef<AbortController | null>(null);
 
   // HF model picker
@@ -355,15 +213,15 @@ export function ControlCenter() {
     }
   }, [intent, consumeEvent]);
 
-  const runVisualLoop = useCallback(async () => {
-    visualAbortRef.current?.abort();
+  const runCodeLoop = useCallback(async () => {
+    codeLoopAbortRef.current?.abort();
     const controller = new AbortController();
-    visualAbortRef.current = controller;
-    setVisualState("streaming");
+    codeLoopAbortRef.current = controller;
+    setCodeLoopState("streaming");
 
     try {
       await streamAgentEvents({
-        url: "/api/agent/visual-loop/stream",
+        endpoint: "/api/agent/code-loop/stream",
         signal: controller.signal,
         init: {
           method: "POST",
@@ -376,17 +234,10 @@ export function ControlCenter() {
         },
         onEvent: consumeEvent,
       });
-      setVisualState("idle");
+      setCodeLoopState("idle");
     } catch (error) {
       if (!controller.signal.aborted) {
-        setVisualState("error");
-        consumeEvent({
-          type: "narration",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Visual loop stream failed.",
-        });
+        setCodeLoopState("error");
       }
     }
   }, [snapshot.derivedConfig, targetPairs, consumeEvent]);
@@ -399,7 +250,7 @@ export function ControlCenter() {
 
     try {
       await streamAgentEvents({
-        url: "/api/training/stream",
+        endpoint: "/api/training/stream",
         signal: controller.signal,
         init: {
           method: "POST",
@@ -411,69 +262,38 @@ export function ControlCenter() {
     } catch (error) {
       if (!controller.signal.aborted) {
         setTrainingState("error");
-        consumeEvent({
-          type: "narration",
-          text:
-            error instanceof Error ? error.message : "Training stream failed.",
-        });
       }
     }
   }, [trainingRunId, consumeEvent]);
 
-  const connectLiveKit = useCallback(async () => {
-    setLiveKitError(null);
-
-    try {
-      const response = await fetch("/api/livekit/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room: "brickbybrick-control",
-          identity: `operator-${crypto.randomUUID().slice(0, 8)}`,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`LiveKit token request failed with ${response.status}`);
-      }
-
-      setLiveKitToken((await response.json()) as LiveKitTokenPayload);
-    } catch (error) {
-      setLiveKitError(
-        error instanceof Error
-          ? error.message
-          : "Unable to mint a LiveKit token.",
-      );
-    }
-  }, []);
-
   const stopStreams = useCallback(() => {
-    visualAbortRef.current?.abort();
+    codeLoopAbortRef.current?.abort();
     trainingAbortRef.current?.abort();
-    setVisualState("idle");
+    setCodeLoopState("idle");
     setTrainingState("idle");
   }, []);
 
   const searchHF = useCallback(async () => {
     setHfSearching(true);
-    // Mock: simulate a network call, filtering the pre-seeded catalogue.
-    // Replace with a real fetch("/api/hf/models?...") once the endpoint exists.
-    await new Promise((r) => setTimeout(r, 400));
-    const q = hfSearch.trim().toLowerCase();
-    const filtered = q
-      ? MOCK_HF_REPOS.filter(
-          (r) =>
-            r.id.toLowerCase().includes(q) || r.label.toLowerCase().includes(q),
-        )
-      : MOCK_HF_REPOS;
-    setHfResults(filtered);
-    setHfSearching(false);
+    try {
+      const res = await fetch(
+        `/api/hf/models?q=${encodeURIComponent(hfSearch.trim())}`,
+      );
+      const data = (await res.json()) as {
+        models: { id: string; label: string }[];
+      };
+      setHfResults(data.models ?? []);
+    } catch {
+      setHfResults([]);
+    } finally {
+      setHfSearching(false);
+    }
   }, [hfSearch]);
 
   const runEval = useCallback(async () => {
     if (!trainingRunId) return;
     await streamAgentEvents({
-      url: "/api/eval/stream",
+      endpoint: "/api/eval/stream",
       init: {
         method: "POST",
         body: JSON.stringify({ runId: trainingRunId, k: 3 }),
@@ -497,52 +317,6 @@ export function ControlCenter() {
     [prompt, trainingRunId],
   );
 
-  // ── Tabs data ───────────────────────────────────────────────────────────
-  const tabRoles = useMemo(
-    () => [
-      {
-        value: "challenger",
-        label: "Challenger",
-        icon: Sparkles,
-        body: snapshot.currentTask?.prompt ?? "Waiting for a challenge…",
-        meta: snapshot.currentTask?.target_mechanism ?? "No mechanism selected",
-      },
-      {
-        value: "weak",
-        label: "Weak solver",
-        icon: Bot,
-        body: snapshot.weakCode ?? "Weak solver draft has not arrived.",
-        meta: snapshot.latestDefect
-          ? `${snapshot.latestDefect.category} / ${snapshot.latestDefect.severity}`
-          : "No defect captured",
-      },
-      {
-        value: "auditor",
-        label: "Auditor",
-        icon: Gauge,
-        body: snapshot.latestAuditStep?.intent ?? "Awaiting visual audit step.",
-        meta: snapshot.latestAuditStep
-          ? `${snapshot.latestAuditStep.viewport.width}x${snapshot.latestAuditStep.viewport.height}`
-          : "No viewport",
-      },
-      {
-        value: "strong",
-        label: "Strong solver",
-        icon: ShieldCheck,
-        body: snapshot.strongCode ?? "Strong fix has not arrived.",
-        meta: snapshot.latestDiff ?? "No diff",
-      },
-    ],
-    [
-      snapshot.currentTask,
-      snapshot.weakCode,
-      snapshot.latestDefect,
-      snapshot.latestAuditStep,
-      snapshot.strongCode,
-      snapshot.latestDiff,
-    ],
-  );
-
   // =========================================================================
   // RENDER
   // =========================================================================
@@ -553,11 +327,11 @@ export function ControlCenter() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Start / Stop / Reset */}
           <Button
-            onClick={runVisualLoop}
-            disabled={visualState === "streaming"}
+            onClick={runCodeLoop}
+            disabled={codeLoopState === "streaming"}
             className="gap-1.5"
           >
-            {visualState === "streaming" ? (
+            {codeLoopState === "streaming" ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             ) : (
               <Play className="size-4" aria-hidden="true" />
@@ -663,16 +437,16 @@ export function ControlCenter() {
           </div>
         </div>
 
-        {/* Visual stream state indicator */}
-        {visualState !== "idle" && (
+        {/* Code loop stream state indicator */}
+        {codeLoopState !== "idle" && (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            {visualState === "streaming" ? (
+            {codeLoopState === "streaming" ? (
               <>
                 <Loader2
                   className="size-3 animate-spin text-emerald-300"
                   aria-hidden="true"
                 />
-                <span className="text-emerald-300">Loop streaming…</span>
+                <span className="text-emerald-300">Code loop streaming…</span>
               </>
             ) : (
               <>
@@ -746,214 +520,10 @@ export function ControlCenter() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          PHASE 1 — Watch it work
+          PHASE 1 — Task / Test-Run View
           ═══════════════════════════════════════════════════════════════════ */}
-      <section
-        className="animate-reveal glass rounded-xl p-5"
-        style={{ animationDelay: "0.05s" }}
-      >
-        <h2 className="font-serif text-xl text-white">Watch it work</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Live audit screenshots and plain-language narration of what the agents
-          are doing right now.
-        </p>
-
-        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
-          {/* Screenshot stream */}
-          <div className="flex min-h-[300px] flex-col justify-between rounded-lg border border-white/10 bg-[#050608] p-4">
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-medium text-white">
-                  Screenshot stream
-                </h3>
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/30 px-2 py-0.5 text-xs text-emerald-300">
-                  <CircleDot className="size-3" aria-hidden="true" />
-                  {snapshot.status}
-                </span>
-              </div>
-
-              {/* Audio visualizer */}
-              <div className="mt-4">
-                {liveKitToken ? (
-                  <LiveKitRoom
-                    token={liveKitToken.token}
-                    serverUrl={liveKitToken.url}
-                    connect
-                    audio={true}
-                    video={false}
-                    className="contents"
-                  >
-                    <RoomAudioRenderer />
-                    <MemoLiveKitNarrationVisualizer />
-                    <MemoMicrophoneControl
-                      muted={micMuted}
-                      onToggle={() => setMicMuted((m) => !m)}
-                    />
-                  </LiveKitRoom>
-                ) : (
-                  <MemoAgentAudioVisualizer />
-                )}
-              </div>
-            </div>
-
-            {/* Connect audio + mic toggle */}
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={connectLiveKit}>
-                  <Mic2 className="size-4" aria-hidden="true" />
-                  Connect audio narration
-                </Button>
-                {liveKitToken && (
-                  <Button
-                    variant={micMuted ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMicMuted((m) => !m)}
-                  >
-                    {micMuted ? (
-                      <MicOff className="size-4" aria-hidden="true" />
-                    ) : (
-                      <Mic2 className="size-4" aria-hidden="true" />
-                    )}
-                    {micMuted ? "Mic off" : "Mic on"}
-                  </Button>
-                )}
-              </div>
-              {liveKitError && (
-                <p className="text-xs leading-5 text-amber-200">
-                  {liveKitError}
-                </p>
-              )}
-              <NarrationLog narration={snapshot.narration} />
-            </div>
-          </div>
-
-          {/* Screenshot display */}
-          <div className="min-h-[300px] overflow-hidden rounded-lg border border-white/10 bg-zinc-950">
-            {snapshot.latestScreenshotSrc ? (
-              <Image
-                src={snapshot.latestScreenshotSrc}
-                alt="Latest visual audit screenshot"
-                width={1280}
-                height={720}
-                unoptimized
-                className="h-full min-h-[300px] w-full object-contain"
-              />
-            ) : (
-              <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 bg-[linear-gradient(135deg,#111827,#080a0d_45%,#0b1512)] p-6 text-center">
-                <ShieldCheck
-                  className="size-10 text-emerald-300"
-                  aria-hidden="true"
-                />
-                <p className="max-w-sm text-sm leading-6 text-zinc-400">
-                  Audit screenshots appear here as the visual auditor inspects
-                  each generated UI.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          PHASE 2 — What it learned
-          ═══════════════════════════════════════════════════════════════════ */}
-      <section
-        className={cn("animate-reveal glass rounded-xl p-5", pulseClass)}
-        style={{ animationDelay: "0.1s" }}
-      >
-        <h2 className="font-serif text-xl text-white">What it learned</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Each adversarial round produces a training pair — or gets filtered out
-          by the quality gate.
-        </p>
-
-        {/* Top-line metrics */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="surface rounded-lg px-3 py-2.5">
-            <div className="text-xs uppercase tracking-wider text-zinc-500">
-              Pairs committed
-            </div>
-            <div className="mt-1 font-mono text-lg font-semibold text-white">
-              {snapshot.committedCount}{" "}
-              <span className="text-sm font-normal text-zinc-500">
-                / {snapshot.targetPairs}
-              </span>
-            </div>
-          </div>
-          <GapMeter value={snapshot.uScore ?? 0} />
-          <div className="surface rounded-lg p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-white">
-              {snapshot.lastRejectedReason ? (
-                <AlertTriangle
-                  className="size-4 text-amber-300"
-                  aria-hidden="true"
-                />
-              ) : (
-                <CheckCircle2
-                  className="size-4 text-emerald-300"
-                  aria-hidden="true"
-                />
-              )}
-              Gate state
-            </div>
-            <p className="mt-1.5 text-xs leading-5 text-zinc-400">
-              {snapshot.lastRejectedReason
-                ? `Last pair was filtered out: ${snapshot.lastRejectedReason.replace("_", " ")}. ` +
-                  "The recipe will be adjusted."
-                : snapshot.committedCount > 0
-                  ? "Latest pair passed the quality gate and is locked into the training set."
-                  : "Waiting for the first pair to be evaluated by the auditor."}
-            </p>
-          </div>
-        </div>
-
-        {/* Tabs: Challenger / Weak / Auditor / Strong */}
-        <div className="mt-5">
-          <Tabs.Root defaultValue="challenger">
-            <Tabs.List className="mb-4 flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/30 p-1">
-              {tabRoles.map((role) => {
-                const Icon = role.icon;
-                return (
-                  <Tabs.Tab
-                    key={role.value}
-                    value={role.value}
-                    className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-zinc-400 outline-none transition hover:bg-white/10 hover:text-white data-[active]:bg-white data-[active]:text-black"
-                  >
-                    <Icon className="size-4" aria-hidden="true" />
-                    {role.label}
-                  </Tabs.Tab>
-                );
-              })}
-            </Tabs.List>
-
-            {tabRoles.map((role) => {
-              const Icon = role.icon;
-              return (
-                <Tabs.Panel
-                  key={role.value}
-                  value={role.value}
-                  className="min-h-[180px] rounded-lg border border-white/10 bg-black/25 p-4"
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <Icon
-                        className="size-4 text-emerald-300"
-                        aria-hidden="true"
-                      />
-                      {role.label}
-                    </div>
-                    <span className="max-w-[55%] truncate text-xs text-zinc-500">
-                      {role.meta}
-                    </span>
-                  </div>
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-300">
-                    {role.body}
-                  </pre>
-                </Tabs.Panel>
-              );
-            })}
-          </Tabs.Root>
-        </div>
+      <section className="animate-reveal" style={{ animationDelay: "0.05s" }}>
+        <CodeTaskView snapshot={snapshot} />
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════
@@ -1288,53 +858,3 @@ export function ControlCenter() {
     </main>
   );
 }
-
-// ---------------------------------------------------------------------------
-// LiveKit narration visualizer — must live inside <LiveKitRoom>
-// ---------------------------------------------------------------------------
-function LiveKitNarrationVisualizer() {
-  const tracks = useTracks([Track.Source.Microphone], {
-    onlySubscribed: true,
-  });
-  const narratorTrack =
-    tracks.find((t) => t.participant.identity.startsWith("narrator-")) ??
-    tracks[0];
-  const levels = useMultibandTrackVolume(narratorTrack, {
-    bands: 24,
-    updateInterval: 80,
-  });
-
-  return (
-    <MemoAgentAudioVisualizer
-      connected={Boolean(narratorTrack)}
-      levels={levels}
-    />
-  );
-}
-
-const MemoLiveKitNarrationVisualizer = memo(LiveKitNarrationVisualizer);
-
-// ---------------------------------------------------------------------------
-// Microphone toggle — must live inside <LiveKitRoom> for useLocalParticipant
-// ---------------------------------------------------------------------------
-function MicrophoneControl({
-  muted,
-  onToggle,
-}: {
-  muted: boolean;
-  onToggle: () => void;
-}) {
-  const { localParticipant } = useLocalParticipant();
-
-  // Sync the LiveKit mic state with our muted state
-  const prevMuted = useRef(muted);
-  useEffect(() => {
-    if (prevMuted.current === muted) return;
-    prevMuted.current = muted;
-    localParticipant?.setMicrophoneEnabled(!muted).catch(() => {});
-  }, [muted, localParticipant]);
-
-  return null; // UI is rendered outside the room context
-}
-
-const MemoMicrophoneControl = memo(MicrophoneControl);

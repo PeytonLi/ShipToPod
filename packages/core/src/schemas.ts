@@ -1,34 +1,69 @@
 import { z } from "zod";
 
 /**
- * @brickbybrick/core — FROZEN SHARED CONTRACTS
+ * @shiptopod/core — SHARED CONTRACTS
  *
- * This file is the single coupling point between the engine (packages/inference,
- * packages/agentbox), the trainer (packages/trainer), and the UI (apps/web).
- * Feature agents IMPORT from here and must not edit it. Additive changes go
- * through the integration agent. See docs/ARCHITECTURE.md §6.
+ * This file is the single coupling point between the engine (packages/inference),
+ * the trainer (packages/trainer), and the UI (apps/web).
+ * Feature agents IMPORT from here and must not edit it.
+ *
+ * PIVOT: ShipToPod backend-code fine-tuning factory.
+ * Replaces VisualTask/Defect/AuditStep with CodeTask/RunResult/TestFailure.
  */
 
 /* ------------------------------------------------------------------ */
-/* Task bank + generation config                                       */
+/* Code task — the unit of work                                        */
 /* ------------------------------------------------------------------ */
 
-export const CriterionSchema = z.object({
+export const CodeTaskSchema = z.object({
   id: z.string(),
-  description: z.string(),
-  /** normalized weight wᵢ used in S(M,T,C); see docs/MATH.md §1 */
-  weight: z.number().min(0).max(1),
-});
-export type Criterion = z.infer<typeof CriterionSchema>;
-
-export const VisualTaskSchema = z.object({
-  id: z.string(),
+  /** Human-readable problem description */
   prompt: z.string(),
-  /** the UI mechanism under test, e.g. "responsive-grid", "modal-focus-trap" */
-  target_mechanism: z.string(),
-  criteria: z.array(CriterionSchema).min(1),
+  /** "python" | "sql" */
+  language: z.enum(["python", "sql"]),
+  /** The hidden test file / test cases (runnable by the runner) */
+  hidden_tests: z.string(),
+  /** Optional fixture / setup code (schema + seed for SQL, imports for Python) */
+  fixture: z.string().optional(),
+  /** Source benchmark, e.g. "mbpp", "humaneval", "spider" */
+  source: z.string().optional(),
 });
-export type VisualTask = z.infer<typeof VisualTaskSchema>;
+export type CodeTask = z.infer<typeof CodeTaskSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Runner primitives                                                    */
+/* ------------------------------------------------------------------ */
+
+export const TestCaseResultSchema = z.object({
+  name: z.string(),
+  passed: z.boolean(),
+  message: z.string().optional(),
+});
+export type TestCaseResult = z.infer<typeof TestCaseResultSchema>;
+
+export const RunResultSchema = z.object({
+  passed: z.boolean(),
+  tests_passed: z.array(TestCaseResultSchema),
+  tests_failed: z.array(TestCaseResultSchema),
+  stdout: z.string(),
+  stderr: z.string(),
+  /** Timeout or system-level error that prevented running */
+  error: z.string().optional(),
+});
+export type RunResult = z.infer<typeof RunResultSchema>;
+
+export const TestFailureSchema = z.object({
+  test_name: z.string(),
+  message: z.string(),
+  language: z.enum(["python", "sql"]),
+  /** The failing code that produced this failure */
+  code: z.string(),
+});
+export type TestFailure = z.infer<typeof TestFailureSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Generation config                                                    */
+/* ------------------------------------------------------------------ */
 
 export const GenerationConfigSchema = z.object({
   /** commit threshold τ ∈ [0.4, 1.0]; pair kept iff 𝒰(T) ≥ τ */
@@ -37,88 +72,37 @@ export const GenerationConfigSchema = z.object({
   diversity_threshold: z.number().min(0).max(1).default(0.82),
   /** run the Recipe Synthesizer every N committed pairs */
   mutate_every_n: z.number().int().positive().default(5),
-  /** per-mechanism sampling weights the Challenger draws from */
+  /** per-language sampling weights the Challenger draws from */
   challenger_weights: z.record(z.string(), z.number()).default({}),
-  /** stop the loop after this many committed pairs (live demo target ~3-8) */
+  /** stop the loop after this many committed pairs */
   max_pairs: z.number().int().positive().default(8),
-  /** when set, the Recipe Synthesizer is forcing focus on this mechanism */
-  focus_mechanism: z.string().nullable().default(null),
+  /** when set, the Recipe Synthesizer is forcing focus on this language */
+  focus_language: z.enum(["python", "sql"]).nullable().default(null),
   /** raw user goal that produced this config (Feature A; provenance) */
   intent: z.string().optional(),
   /** LLM-expanded steering paragraph injected into the Challenger (Feature A) */
   domain_framing: z.string().optional(),
-  /** front-end framework hint, e.g. "react" | "vue" | "vanilla" (Feature A) */
-  framework: z.string().optional(),
 });
 export type GenerationConfig = z.infer<typeof GenerationConfigSchema>;
-
-/* ------------------------------------------------------------------ */
-/* Audit primitives                                                    */
-/* ------------------------------------------------------------------ */
-
-export const ViewportSchema = z.object({
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-});
-export type Viewport = z.infer<typeof ViewportSchema>;
-
-/** one exploratory action the Antigravity sandbox performed in-browser */
-export const AuditStepSchema = z.object({
-  /** base64-encoded PNG screenshot captured after the action */
-  screenshot: z.string(),
-  /** the action taken, e.g. "click", "resize", "type", "scroll" */
-  action: z.string(),
-  /** the agent's stated intent for this action */
-  intent: z.string(),
-  viewport: ViewportSchema,
-});
-export type AuditStep = z.infer<typeof AuditStepSchema>;
-
-export const DefectCategorySchema = z.enum([
-  "layout_collision",
-  "overflow",
-  "truncation",
-  "offscreen_render",
-  "frozen_state",
-  "script_error",
-  "other",
-]);
-export type DefectCategory = z.infer<typeof DefectCategorySchema>;
-
-export const SeveritySchema = z.enum(["low", "medium", "high", "critical"]);
-export type Severity = z.infer<typeof SeveritySchema>;
-
-export const DefectSchema = z.object({
-  /** base64 PNG of the broken state */
-  screenshot: z.string(),
-  /** captured DOM / console stack trace */
-  dom_trace: z.string(),
-  category: DefectCategorySchema,
-  severity: SeveritySchema,
-});
-export type Defect = z.infer<typeof DefectSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Scoring + training pair                                             */
 /* ------------------------------------------------------------------ */
 
-/** S(M,T,C) is computed from these per-criterion results; see docs/MATH.md §1 */
-export const CriterionScoreSchema = z.object({
-  criterion_id: z.string(),
-  passed: z.boolean(),
-  weight: z.number().min(0).max(1),
-});
-export type CriterionScore = z.infer<typeof CriterionScoreSchema>;
-
+/**
+ * TrainingPair — the committed break-and-fix example.
+ * Shape kept stable so the trainer changes minimally.
+ */
 export const TrainingPairSchema = z.object({
   id: z.string(),
-  task: VisualTaskSchema,
-  /** the weak model's (Gemma 4) draft that failed the audit */
+  task: CodeTaskSchema,
+  /** the student model's failing draft */
   weak_code: z.string(),
-  defect: DefectSchema,
-  /** the strong model's (Gemini 3.1 Pro) fix that passed the audit */
+  /** the test failure(s) from the student's draft */
+  failure: TestFailureSchema,
+  /** the teacher model's (DeepSeek) passing fix */
   strong_code: z.string(),
-  /** 𝒰(T) = S(strong) − S(weak), in [0,1] */
+  /** 𝒰(T) = fraction of tests strong passed − fraction weak passed, in [0,1] */
   u_score: z.number().min(0).max(1),
 });
 export type TrainingPair = z.infer<typeof TrainingPairSchema>;
@@ -128,13 +112,12 @@ export type TrainingPair = z.infer<typeof TrainingPairSchema>;
 /* ------------------------------------------------------------------ */
 
 export const EvalTaskResultSchema = z.object({
-  task: VisualTaskSchema,
-  base_score: z.number(),
-  tuned_score: z.number(),
-  base_passed_criteria: z.array(z.string()),
-  tuned_passed_criteria: z.array(z.string()),
+  task: CodeTaskSchema,
+  base_passed: z.number().int().nonnegative(),
+  base_total: z.number().int().positive(),
+  tuned_passed: z.number().int().nonnegative(),
+  tuned_total: z.number().int().positive(),
   winner: z.enum(["base", "tuned", "tie"]),
-  inconclusive: z.boolean().optional(),
 });
 export type EvalTaskResult = z.infer<typeof EvalTaskResultSchema>;
 
@@ -143,10 +126,9 @@ export const EvalReportSchema = z.object({
   k: z.number().int().nonnegative(),
   base_model: z.string(),
   tuned_model: z.string(),
-  wins: z.number().int().nonnegative(),
-  ties: z.number().int().nonnegative(),
-  losses: z.number().int().nonnegative(),
-  mean_score_delta: z.number(),
+  base_pass_at_1: z.number().min(0).max(1),
+  tuned_pass_at_1: z.number().min(0).max(1),
+  delta: z.number(),
   tasks: z.array(EvalTaskResultSchema),
 });
 export type EvalReport = z.infer<typeof EvalReportSchema>;
@@ -176,20 +158,29 @@ export type TrainingStatus = z.infer<typeof TrainingStatusSchema>;
 /* AgentEvent — the SSE payload between engine and UI                  */
 /* ------------------------------------------------------------------ */
 
-export const PairRejectReasonSchema = z.enum(["too_easy", "redundant"]);
+export const PairRejectReasonSchema = z.enum([
+  "too_easy",
+  "not_fixed",
+  "redundant",
+]);
 export type PairRejectReason = z.infer<typeof PairRejectReasonSchema>;
 
 export const AgentEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("challenge_generated"), task: VisualTaskSchema }),
+  z.object({ type: z.literal("challenge_generated"), task: CodeTaskSchema }),
   z.object({ type: z.literal("weak_code_drafted"), code: z.string() }),
-  z.object({ type: z.literal("audit_step"), step: AuditStepSchema }),
-  z.object({ type: z.literal("defect_found"), defect: DefectSchema }),
+  z.object({
+    type: z.literal("weak_run_result"),
+    result: RunResultSchema,
+  }),
   z.object({
     type: z.literal("strong_fix_generated"),
     code: z.string(),
     diff: z.string(),
   }),
-  z.object({ type: z.literal("audit_pass") }),
+  z.object({
+    type: z.literal("strong_run_result"),
+    result: RunResultSchema,
+  }),
   z.object({
     type: z.literal("pair_committed"),
     pair: TrainingPairSchema,
@@ -203,7 +194,6 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     type: z.literal("recipe_mutated"),
     patch: GenerationConfigSchema.partial(),
   }),
-  z.object({ type: z.literal("narration"), text: z.string() }),
   z.object({
     type: z.literal("training_event"),
     loss: LossPointSchema.optional(),
@@ -241,10 +231,10 @@ export type AgentEventType = AgentEvent["type"];
 /* ------------------------------------------------------------------ */
 
 /**
- * The visual break-and-fix loop. Implemented in packages/inference/src/loop.ts,
+ * The code break-and-fix loop. Implemented in packages/inference/src/loop.ts,
  * driven by the web API route which forwards each emitted event over SSE.
  */
-export type RunVisualLoop = (
+export type RunCodeLoop = (
   config: GenerationConfig,
   emit: (event: AgentEvent) => void,
 ) => Promise<void>;

@@ -2,7 +2,7 @@ import {
   AgentEventSchema,
   parseSSEData,
   type AgentEvent,
-} from "@brickbybrick/core";
+} from "@shiptopod/core";
 
 type MessageLike = MessageEvent<string> | { data: string };
 

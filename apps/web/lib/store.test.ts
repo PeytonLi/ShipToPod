@@ -1,33 +1,54 @@
 import { describe, it, expect } from "vitest";
 
-import type { AgentEvent, TrainingPair, VisualTask } from "@brickbybrick/core";
+import type { AgentEvent, CodeTask, RunResult, TestFailure, TrainingPair } from "@shiptopod/core";
 
 import { initialAgentState, reduceAgentState } from "./store";
 
-const screenshot =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lF0QJwAAAABJRU5ErkJggg==";
+const task: CodeTask = {
+  id: "task-python-fizzbuzz",
+  prompt: "Write a Python function fizzbuzz(n) that returns a list of strings.",
+  language: "python",
+  hidden_tests: "assert fizzbuzz(5) == ['1','2','Fizz','4','Buzz']",
+  fixture: "",
+  source: "mbpp",
+};
 
-const task: VisualTask = {
-  id: "task-responsive-grid",
-  prompt: "Stress the responsive grid with long product names.",
-  target_mechanism: "responsive-grid",
-  criteria: [
-    { id: "no-overflow", description: "No horizontal overflow", weight: 1 },
+const weakRun: RunResult = {
+  passed: false,
+  tests_passed: [],
+  tests_failed: [
+    { name: "test_fizzbuzz_5", passed: false, message: "Expected 'Fizz' got '3'" },
+    { name: "test_fizzbuzz_15", passed: false, message: "Expected 'FizzBuzz' got '15'" },
   ],
+  stdout: "",
+  stderr: "",
+};
+
+const strongRun: RunResult = {
+  passed: true,
+  tests_passed: [
+    { name: "test_fizzbuzz_5", passed: true },
+    { name: "test_fizzbuzz_15", passed: true },
+  ],
+  tests_failed: [],
+  stdout: "",
+  stderr: "",
+};
+
+const failure: TestFailure = {
+  test_name: "test_fizzbuzz_5",
+  message: "Expected 'Fizz' got '3'",
+  language: "python",
+  code: "def fizzbuzz(n): return [str(i) for i in range(1, n+1)]",
 };
 
 const pair: TrainingPair = {
   id: "pair-1",
   task,
-  weak_code: "<Grid />",
-  strong_code: '<Grid className="min-w-0" />',
+  weak_code: "def fizzbuzz(n): return [str(i) for i in range(1, n+1)]",
+  strong_code: "def fizzbuzz(n): return ['Fizz'*(i%3==0)+'Buzz'*(i%5==0) or str(i) for i in range(1,n+1)]",
   u_score: 0.72,
-  defect: {
-    screenshot,
-    dom_trace: "div.card overflowed",
-    category: "overflow",
-    severity: "high",
-  },
+  failure,
 };
 
 describe("reduceAgentState", () => {
@@ -35,30 +56,17 @@ describe("reduceAgentState", () => {
     const events: AgentEvent[] = [
       { type: "challenge_generated", task },
       { type: "weak_code_drafted", code: pair.weak_code },
-      {
-        type: "audit_step",
-        step: {
-          screenshot,
-          action: "resize",
-          intent: "check mobile overflow",
-          viewport: { width: 390, height: 844 },
-        },
-      },
-      { type: "defect_found", defect: pair.defect },
+      { type: "weak_run_result", result: weakRun },
       {
         type: "strong_fix_generated",
         code: pair.strong_code,
-        diff: "+ min-w-0",
+        diff: "+ fizzbuzz with modulo logic",
       },
-      { type: "audit_pass" },
+      { type: "strong_run_result", result: strongRun },
       { type: "pair_rejected", reason: "too_easy" },
       {
         type: "recipe_mutated",
-        patch: { focus_mechanism: "modal-focus-trap" },
-      },
-      {
-        type: "narration",
-        text: "Rejecting the easy case and mutating the recipe.",
+        patch: { focus_language: "sql" },
       },
       {
         type: "training_event",
@@ -73,14 +81,12 @@ describe("reduceAgentState", () => {
 
     expect(state.currentTask).toEqual(task);
     expect(state.weakCode).toBe(pair.weak_code);
-    expect(state.latestDefect).toEqual(pair.defect);
+    expect(state.latestWeakRunResult).toEqual(weakRun);
+    expect(state.latestStrongRunResult).toEqual(strongRun);
     expect(state.strongCode).toBe(pair.strong_code);
-    expect(state.latestDiff).toBe("+ min-w-0");
+    expect(state.latestDiff).toBe("+ fizzbuzz with modulo logic");
     expect(state.lastRejectedReason).toBeNull();
-    expect(state.recipePatch).toEqual({ focus_mechanism: "modal-focus-trap" });
-    expect(state.narration).toContain(
-      "Rejecting the easy case and mutating the recipe.",
-    );
+    expect(state.recipePatch).toEqual({ focus_language: "sql" });
     expect(state.training.instance).toBe("h100-80gb-a");
     expect(state.committedCount).toBe(1);
     expect(state.committedPairs).toEqual([pair]);
@@ -88,21 +94,14 @@ describe("reduceAgentState", () => {
     expect(state.lastEventType).toBe("pair_committed");
   });
 
-  it("updates audit screenshots on audit_step", () => {
+  it("updates run results on weak_run_result", () => {
     const state = reduceAgentState(initialAgentState, {
-      type: "audit_step",
-      step: {
-        screenshot,
-        action: "click",
-        intent: "open the overflow menu",
-        viewport: { width: 1280, height: 720 },
-      },
+      type: "weak_run_result",
+      result: weakRun,
     });
 
-    expect(state.latestAuditStep?.action).toBe("click");
-    expect(state.latestScreenshotSrc).toBe(
-      `data:image/png;base64,${screenshot}`,
-    );
+    expect(state.latestWeakRunResult?.passed).toBe(false);
+    expect(state.latestWeakRunResult?.tests_failed.length).toBe(2);
     expect(state.committedCount).toBe(0);
   });
 
@@ -122,18 +121,18 @@ describe("reduceAgentState", () => {
     const state = reduceAgentState(initialAgentState, {
       type: "training_event",
       status: "provisioning",
-      instance: "bbb-gemma-1719000000000",
+      instance: "stp-gemma-1719000000000",
     });
 
-    expect(state.trainingRunId).toBe("bbb-gemma-1719000000000");
-    expect(state.training.instance).toBe("bbb-gemma-1719000000000");
+    expect(state.trainingRunId).toBe("stp-gemma-1719000000000");
+    expect(state.training.instance).toBe("stp-gemma-1719000000000");
   });
 
   it("preserves trainingRunId across subsequent training events without instance", () => {
     const first = reduceAgentState(initialAgentState, {
       type: "training_event",
       status: "provisioning",
-      instance: "bbb-gemma-1719000000000",
+      instance: "stp-gemma-1719000000000",
     });
 
     const second = reduceAgentState(first, {
@@ -142,7 +141,7 @@ describe("reduceAgentState", () => {
       loss: { step: 1, epoch: 0.2, loss: 2.1 },
     });
 
-    expect(second.trainingRunId).toBe("bbb-gemma-1719000000000");
+    expect(second.trainingRunId).toBe("stp-gemma-1719000000000");
     expect(second.training.loss).toEqual([{ step: 1, epoch: 0.2, loss: 2.1 }]);
   });
 });
@@ -152,13 +151,13 @@ describe("reduceAgentState — intent_expanded (Feature A)", () => {
     const s = reduceAgentState(initialAgentState, {
       type: "intent_expanded",
       config: {
-        intent: "react",
-        framework: "react",
-        challenger_weights: { "responsive-card-grid": 3 },
+        intent: "python functions",
+        focus_language: "python",
+        challenger_weights: { "list-processing": 3 },
       },
       sample_titles: ["A", "B"],
     });
-    expect(s.derivedConfig?.framework).toBe("react");
+    expect(s.derivedConfig?.focus_language).toBe("python");
     expect(s.sampleTitles).toEqual(["A", "B"]);
   });
 });
@@ -182,14 +181,13 @@ describe("reduceAgentState — eval + serving (Feature C)", () => {
         k: 2,
         base_model: "g",
         tuned_model: "tuned",
-        wins: 2,
-        ties: 0,
-        losses: 0,
-        mean_score_delta: 0.4,
+        base_pass_at_1: 0.3,
+        tuned_pass_at_1: 0.7,
+        delta: 0.4,
         tasks: [],
       },
     });
     expect(s.evalRunning).toBe(false);
-    expect(s.evalReport?.wins).toBe(2);
+    expect(s.evalReport?.delta).toBe(0.4);
   });
 });

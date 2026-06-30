@@ -1,5 +1,5 @@
 {
-  "name": "@brickbybrick/db",
+  "name": "@shiptopod/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "lint": "echo ok"
   },
   "dependencies": {
-    "@brickbybrick/core": "workspace:*",
+    "@shiptopod/core": "workspace:*",
     "mongoose": "^8.10.0"
   },
   "devDependencies": {

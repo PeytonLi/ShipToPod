@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  formatSSE,
-  SSE_HEADERS,
-  type AgentEvent,
-} from "@brickbybrick/core";
-import { connectDB, RunModel } from "@brickbybrick/db";
+import { formatSSE, SSE_HEADERS, type AgentEvent } from "@shiptopod/core";
+import { connectDB, RunModel } from "@shiptopod/db";
 import { demoRunEval } from "../demo-runner";
 
 export const runtime = "nodejs";
@@ -35,34 +31,30 @@ export async function POST(request: Request) {
           await connectDB();
           const run = await RunModel.byId(runId).lean();
           if (!run?.serve?.serveUrl) {
-            emit({
-              type: "narration",
-              text: "No live served model for this run; train first.",
-            });
+            console.log(
+              "[eval] No live served model for this run; train first.",
+            );
           } else {
             const inf =
-              (await import("@brickbybrick/inference")) as typeof import("@brickbybrick/inference");
+              (await import("@shiptopod/inference")) as typeof import("@shiptopod/inference");
             await inf.runEval(
               {
                 runId,
-                config: run.config,
                 k,
                 baseModel: run.serve.baseModel,
                 tunedModel: "tuned",
+                tunedBaseUrl: run.serve.serveUrl,
               },
               emit,
-              inf.createEvalDeps(run.serve.serveUrl, run.serve.baseModel),
+              inf.createEvalDeps(run.serve.serveUrl),
             );
           }
         }
       } catch (error) {
-        emit({
-          type: "narration",
-          text:
-            error instanceof Error
-              ? `Eval failed: ${error.message}`
-              : "Eval failed.",
-        });
+        console.error(
+          "[eval] Eval failed:",
+          error instanceof Error ? error.message : error,
+        );
       } finally {
         controller.close();
       }

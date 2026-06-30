@@ -1,5 +1,5 @@
 {
-  "name": "@brickbybrick/trainer",
+  "name": "@shiptopod/trainer"
   "version": "0.1.0",
   "private": true,
   "exports": {
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@brickbybrick/core": "workspace:*"
+    "@shiptopod/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",

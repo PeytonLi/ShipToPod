@@ -2,10 +2,9 @@ import type {
   GenerationConfig,
   AgentEvent,
   AgentEventType,
-  VisualTask,
-  Defect,
-  Criterion,
-} from "@brickbybrick/core";
+  CodeTask,
+  TestFailure,
+} from "@shiptopod/core";
 
 export interface LoopRun {
   runId: string;
@@ -26,9 +25,9 @@ export interface LoopRun {
 export interface PersistedPair {
   pairId: string;
   runId: string;
-  task: VisualTask;
+  task: CodeTask;
   weak_code: string;
-  defect: Defect;
+  failure: TestFailure;
   strong_code: string;
   u_score: number;
   createdAt: Date;
@@ -45,8 +44,9 @@ export interface PersistedEvent {
 export interface PersistedTask {
   id: string;
   prompt: string;
-  target_mechanism: string;
-  criteria: Criterion[];
+  language: string;
+  hidden_tests: string;
+  source: string;
   timesUsed: number;
   createdAt: Date;
 }

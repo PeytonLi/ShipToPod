@@ -1,6 +1,6 @@
 // apps/web/app/api/intent/expand/route.ts
 import { NextResponse } from "next/server";
-import type { GenerationConfig } from "@brickbybrick/core";
+import type { GenerationConfig } from "@shiptopod/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ function demoExpand(intent: string): ExpandResult {
     config: {
       intent,
       domain_framing: `Front-end UI tasks aligned to: ${intent}`,
-      framework: "react",
+      focus_language: null,
       challenger_weights: {
         "responsive-card-grid": 3,
         "modal-focus-trap": 2,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { expandIntent } = (await import("@brickbybrick/inference")) as {
+    const { expandIntent } = (await import("@shiptopod/inference")) as {
       expandIntent: (t: string) => Promise<ExpandResult>;
     };
     return NextResponse.json(await expandIntent(intent));
