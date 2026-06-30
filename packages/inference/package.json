@@ -3,7 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./src/runners/sql": "./src/runners/sql.ts",
+    "./src/runners/python": "./src/runners/python.ts",
+    "./src/runners/index": "./src/runners/index.ts",
+    "./src/metrics": "./src/metrics.ts",
+    "./src/deepseek": "./src/deepseek.ts",
+    "./src/tasks/loader": "./src/tasks/loader.ts",
+    "./src/tasks/challenger": "./src/tasks/challenger.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -12,7 +19,7 @@
   },
   "dependencies": {
     "@shiptopod/core": "workspace:*",
-        "better-sqlite3": "^11.0.0"
+    "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
     "@types/node": "^22",

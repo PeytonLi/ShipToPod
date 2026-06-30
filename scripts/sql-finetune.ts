@@ -25,8 +25,26 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Load .env.local from repo root (existing process.env wins)
+function loadDotEnvLocal(): void {
+  try {
+    const root = dirname(dirname(fileURLToPath(import.meta.url)));
+    const envPath = join(root, ".env.local");
+    if (!existsSync(envPath)) return;
+    for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    }
+  } catch {
+    /* ok */
+  }
+}
+loadDotEnvLocal();
+
 // ---- @shiptopod/inference ----
 import {
   loadBenchmarkTasks,
