@@ -211,18 +211,19 @@ describe("Gemma dataset conversion", () => {
         id: "pair-1",
         task: {
           id: "task-1",
-          prompt: "Fix mobile overflow.",
-          target_mechanism: "responsive-grid",
-          criteria: [{ id: "c1", description: "No overflow", weight: 1 }],
+          prompt: "Write a function that checks if a number is prime",
+          language: "python",
+          hidden_tests: "assert is_prime(7) == True",
         },
-        weak_code: "<Grid />",
-        defect: {
-          screenshot: "PNG",
-          dom_trace: "overflow",
-          category: "overflow",
-          severity: "high",
+        weak_code: "def is_prime(n): pass",
+        failure: {
+          test_name: "test_prime",
+          message: "AssertionError: is_prime(7) returned None",
+          language: "python",
+          code: "def is_prime(n): pass",
         },
-        strong_code: '<Grid className="min-w-0" />',
+        strong_code:
+          "def is_prime(n): return n > 1 and all(n % i for i in range(2, int(n**0.5)+1))",
         u_score: 1,
       },
     ]);
@@ -230,7 +231,7 @@ describe("Gemma dataset conversion", () => {
     const row = JSON.parse(jsonl);
     expect(row.messages).toHaveLength(3);
     expect(row.messages[1].content).toContain("Weak implementation");
-    expect(row.messages[2].content).toBe('<Grid className="min-w-0" />');
+    expect(row.messages[2].content).toContain("def is_prime");
   });
 });
 

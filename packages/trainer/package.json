@@ -1,5 +1,5 @@
 {
-  "name": "@shiptopod/trainer"
+  "name": "@shiptopod/trainer",
   "version": "0.1.0",
   "private": true,
   "exports": {

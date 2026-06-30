@@ -426,12 +426,12 @@ function trainingPairToChatJsonl(pairs: TrainingPair[]): string {
           {
             role: "user",
             content: [
-                `Task: ${pair.task.prompt}`,
-                `Language: ${pair.task.language}`,
-                `Weak implementation:\n${pair.weak_code}`,
-                `Test failure: ${pair.failure.test_name}`,
-                `Failure message: ${pair.failure.message}`,
-              ].join("\n\n"),
+              `Task: ${pair.task.prompt}`,
+              `Language: ${pair.task.language}`,
+              `Weak implementation:\n${pair.weak_code}`,
+              `Test failure: ${pair.failure.test_name}`,
+              `Failure message: ${pair.failure.message}`,
+            ].join("\n\n"),
           },
           { role: "assistant", content: pair.strong_code },
         ],
@@ -478,8 +478,7 @@ export async function runGemmaLoraTraining(
 
   const hfToken =
     opts.hfToken ?? process.env.HF_TOKEN ?? loadDotEnvLocal().HF_TOKEN;
-  if (!hfToken)
-    throw new Error("HF_TOKEN is required for LoRA training");
+  if (!hfToken) throw new Error("HF_TOKEN is required for LoRA training");
 
   const runName = opts.runName ?? `shiptopod-deepseek-${Date.now()}`;
   const modelId =
@@ -823,7 +822,7 @@ export const internalPrimeTestUtils = {
   trainingPairToChatJsonl,
   numberFromStatus,
   buildRemoteTrainingCommand,
-  resolveHubRepoFromEnv,
+  resolveHubRepo: resolveHubRepoFromEnv,
   buildServeCommand,
 };
 

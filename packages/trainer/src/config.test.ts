@@ -5,7 +5,7 @@ describe("buildTrainingConfig", () => {
   it("emits valid TOML with default params", () => {
     const toml = buildTrainingConfig();
     expect(toml).toContain("[model]");
-    expect(toml).toContain('base = "google/gemma-4-26B-A4B-it"');
+    expect(toml).toContain('base = "deepseek-ai/deepseek-coder-1.3b-instruct"');
     expect(toml).toContain("[lora]");
     expect(toml).toContain("rank = 16");
     expect(toml).toContain("alpha = 32");
@@ -43,7 +43,7 @@ describe("buildTrainingConfig", () => {
   it("overrides batch_size", () => {
     const toml = buildTrainingConfig({ batch_size: 8 });
     expect(toml).toContain("batch_size = 8");
-    expect(toml).not.toContain("batch_size = 4");
+    expect(toml).not.toContain("batch_size = 2");
   });
 
   it("overrides lr", () => {

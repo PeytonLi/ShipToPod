@@ -1,96 +1,85 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from "vitest";
 import {
   CHALLENGER_SYSTEM,
-  WEAK_SOLVER_SYSTEM,
-  STRONG_SOLVER_SYSTEM,
-  ANTIGRAVITY_AUDIT_SYSTEM,
+  STUDENT_SYSTEM,
+  TEACHER_SYSTEM,
   RECIPE_SYNTHESIZER_SYSTEM,
-} from './prompts'
+  INTENT_EXPANDER_SYSTEM,
+} from "./prompts";
 
-describe('prompts are all present and non-trivial', () => {
+describe("prompts are all present and non-trivial", () => {
   it.each([
-    ['CHALLENGER_SYSTEM', CHALLENGER_SYSTEM],
-    ['WEAK_SOLVER_SYSTEM', WEAK_SOLVER_SYSTEM],
-    ['STRONG_SOLVER_SYSTEM', STRONG_SOLVER_SYSTEM],
-    ['ANTIGRAVITY_AUDIT_SYSTEM', ANTIGRAVITY_AUDIT_SYSTEM],
-    ['RECIPE_SYNTHESIZER_SYSTEM', RECIPE_SYNTHESIZER_SYSTEM],
-  ])('%s is a substantial string', (_name, value) => {
-    expect(typeof value).toBe('string')
-    expect(value.length).toBeGreaterThan(80)
-  })
-})
+    ["CHALLENGER_SYSTEM", CHALLENGER_SYSTEM],
+    ["RECIPE_SYNTHESIZER_SYSTEM", RECIPE_SYNTHESIZER_SYSTEM],
+    ["INTENT_EXPANDER_SYSTEM", INTENT_EXPANDER_SYSTEM],
+  ])("%s is a substantial string", (_name, value) => {
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(80);
+  });
 
-describe('CHALLENGER_SYSTEM', () => {
-  it('asks for a JSON visual task with criteria and a target mechanism', () => {
-    expect(CHALLENGER_SYSTEM).toMatch(/json/i)
-    expect(CHALLENGER_SYSTEM).toMatch(/criteria/i)
-    expect(CHALLENGER_SYSTEM).toMatch(/mechanism/i)
-  })
-})
+  it("STUDENT_SYSTEM() returns a language-specific prompt", () => {
+    const py = STUDENT_SYSTEM("python");
+    expect(py).toContain("Python");
+    const sql = STUDENT_SYSTEM("sql");
+    expect(sql).toContain("SQL");
+  });
 
-describe('WEAK_SOLVER_SYSTEM', () => {
-  it('asks for front-end UI code without extra hardening', () => {
-    expect(WEAK_SOLVER_SYSTEM).toMatch(/react|html|css|component/i)
-  })
-})
+  it("TEACHER_SYSTEM() returns a language-specific prompt", () => {
+    const py = TEACHER_SYSTEM("python");
+    expect(py).toContain("Python");
+    expect(py).toMatch(/fix|correct/i);
+    const sql = TEACHER_SYSTEM("sql");
+    expect(sql).toContain("SQL");
+  });
+});
 
-describe('STRONG_SOLVER_SYSTEM', () => {
-  it('frames the task as fixing the reported visual defect', () => {
-    expect(STRONG_SOLVER_SYSTEM).toMatch(/fix|repair|correct/i)
-    expect(STRONG_SOLVER_SYSTEM).toMatch(/defect|bug|issue/i)
-  })
-})
+describe("CHALLENGER_SYSTEM", () => {
+  it("asks for a JSON code task with language and hidden tests", () => {
+    expect(CHALLENGER_SYSTEM).toMatch(/json/i);
+    expect(CHALLENGER_SYSTEM).toMatch(/language/i);
+    expect(CHALLENGER_SYSTEM).toMatch(/hidden_tests/);
+    expect(CHALLENGER_SYSTEM).toMatch(/prompt/);
+  });
+  it("requires python or sql tasks", () => {
+    expect(CHALLENGER_SYSTEM).toMatch(/python\|sql/);
+  });
+});
 
-describe('ANTIGRAVITY_AUDIT_SYSTEM — the in-sandbox visual auditor', () => {
-  it('instructs serving on :3000', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/3000/)
-  })
-  it('instructs opening a browser and resizing to mobile widths', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/browser/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/mobile|resize|375|viewport/i)
-  })
-  it('instructs injecting fringe / boundary input data', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/fringe|boundary|edge/i)
-  })
-  it('instructs at least five exploratory clicks', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/\b5\b|five/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/click/i)
-  })
-  it('instructs capturing screenshots and a DOM trace of defects', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/screenshot/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/dom/i)
-  })
-  it('names the defect classes to watch for', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/collision|overflow|frozen/i)
-  })
-  it('requires a pass/fail verdict', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/pass/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/fail/i)
-  })
+describe("STUDENT_SYSTEM", () => {
+  it("asks for straightforward code without defensive patterns (python)", () => {
+    const prompt = STUDENT_SYSTEM("python");
+    expect(prompt).toMatch(/junior|straightforward/i);
+    expect(prompt).toContain("Python");
+  });
+  it("frames the task as a junior SQL developer", () => {
+    const prompt = STUDENT_SYSTEM("sql");
+    expect(prompt).toMatch(/junior|straightforward/i);
+    expect(prompt).toContain("SQL");
+  });
+});
 
-  // The real API carries no screenshots inline; we get them via our sentinel
-  // protocol (live base64 thumbnails) + saved full-res PNG files. The prompt is
-  // the contract that antigravity.ts's extractAuditSteps / parseAuditReport parse.
-  it('teaches the live thumbnail sentinel with a base64 thumbnail', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toContain('<<<AUDIT_STEP>>>')
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toContain('<<<END>>>')
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/base64/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/thumbnail/i)
-  })
-  it('requires the structured VERDICT block with category + severity', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toContain('<<<VERDICT>>>')
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/passed_criteria/)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/failed_criteria/)
-  })
-  it('tells the agent to save full-resolution PNG screenshots as files', () => {
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/\.png/i)
-    expect(ANTIGRAVITY_AUDIT_SYSTEM).toMatch(/save|write/i)
-  })
-})
+describe("TEACHER_SYSTEM", () => {
+  it("frames the task as fixing a broken implementation (python)", () => {
+    const prompt = TEACHER_SYSTEM("python");
+    expect(prompt).toMatch(/fix|correct/i);
+    expect(prompt).toContain("Python");
+    expect(prompt).toMatch(/failing|failure|broken|wrong/i);
+  });
+});
 
-describe('RECIPE_SYNTHESIZER_SYSTEM', () => {
-  it('asks for a JSON config patch that can refocus generation', () => {
-    expect(RECIPE_SYNTHESIZER_SYSTEM).toMatch(/json/i)
-    expect(RECIPE_SYNTHESIZER_SYSTEM).toMatch(/mechanism|focus|weight/i)
-  })
-})
+describe("RECIPE_SYNTHESIZER_SYSTEM", () => {
+  it("asks for a JSON config patch with language focus and weights", () => {
+    expect(RECIPE_SYNTHESIZER_SYSTEM).toMatch(/json/i);
+    expect(RECIPE_SYNTHESIZER_SYSTEM).toMatch(/focus_language/);
+    expect(RECIPE_SYNTHESIZER_SYSTEM).toMatch(/challenger_weights/);
+  });
+});
+
+describe("INTENT_EXPANDER_SYSTEM", () => {
+  it("translates user goals into code curriculum config", () => {
+    expect(INTENT_EXPANDER_SYSTEM).toMatch(/json/i);
+    expect(INTENT_EXPANDER_SYSTEM).toMatch(/focus_language/);
+    expect(INTENT_EXPANDER_SYSTEM).toMatch(/challenger_weights/);
+    expect(INTENT_EXPANDER_SYSTEM).toMatch(/sample_titles/);
+  });
+});

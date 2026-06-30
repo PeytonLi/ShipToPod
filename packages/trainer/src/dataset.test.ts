@@ -46,9 +46,10 @@ describe("exportDataset", () => {
     const parsed = JSON.parse(result.trim());
 
     expect(parsed.id).toBe("pair-1");
-    expect(parsed.task.id).toBe("task-1");
+    expect(parsed.language).toBe("python");
+    expect(parsed.prompt).toBe("Build a responsive grid");
     expect(parsed.weak_code).toBe(pair.weak_code);
-    expect(parsed.failure.test_name).toBe("test_grid_overflow");
+    expect(parsed.failure).toBe("test_grid_overflow");
     expect(parsed.strong_code).toBe(pair.strong_code);
     expect(parsed.u_score).toBe(0.72);
   });

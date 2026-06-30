@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { LossPoint, TrainingPair } from "@shiptopod/core";
-import { LORA_TRAINER_PY } from "./remote-script";
+import { GEMMA_LORA_TRAINER_PY } from "./remote-script";
 
 const DEFAULT_IMAGE =
   "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04";
@@ -387,7 +387,7 @@ function buildRemoteTrainingCommand(opts: {
       shellQuote(opts.hfToken) +
       " " +
       py +
-      " train_lora.py --dataset dataset.jsonl --output adapter" +
+      " train_gemma_lora.py --dataset dataset.jsonl --output adapter" +
       " --model " +
       shellQuote(opts.modelId) +
       stepsFlag +
@@ -437,7 +437,7 @@ function buildDetachedTrainingCommand(opts: {
       shellQuote(opts.hfToken) +
       " nohup " +
       py +
-      " train_lora.py --dataset dataset.jsonl --output adapter" +
+      " train_gemma_lora.py --dataset dataset.jsonl --output adapter" +
       " --model " +
       shellQuote(opts.modelId) +
       stepsFlag +
@@ -591,14 +591,14 @@ export async function runTraining(
     const remoteDir = (opts.remoteRoot ?? DEFAULT_REMOTE_ROOT) + "/" + runName;
 
     const datasetPath = join(localDir, "dataset.jsonl");
-    const scriptPath = join(localDir, "train_lora.py");
+    const scriptPath = join(localDir, "train_gemma_lora.py");
     writeFileSync(datasetPath, trainingPairToChatJsonl(opts.pairs), "utf8");
-    writeFileSync(scriptPath, LORA_TRAINER_PY, "utf8");
+    writeFileSync(scriptPath, GEMMA_LORA_TRAINER_PY, "utf8");
 
     callbacks.onStatus?.("uploading", podId);
     runRemote(sshInfo, "mkdir -p " + shellQuote(remoteDir));
     copyToPod(sshInfo, datasetPath, remoteDir + "/dataset.jsonl");
-    copyToPod(sshInfo, scriptPath, remoteDir + "/train_lora.py");
+    copyToPod(sshInfo, scriptPath, remoteDir + "/train_gemma_lora.py");
 
     callbacks.onStatus?.("training", podId);
     if (opts.detached) {
