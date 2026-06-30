@@ -52,7 +52,7 @@ function makeDeps(over: Partial<CodeLoopDeps> = {}): CodeLoopDeps {
       if (code === "WEAK") {
         return {
           passed: false,
-          sScore: 0,
+          sScore: 0, stdout: "", stderr: "",
           tests_passed: [] as { name: string; passed: boolean }[],
           tests_failed: [
             { name: "test_overflow", passed: false, message: "overflow" },
@@ -61,7 +61,7 @@ function makeDeps(over: Partial<CodeLoopDeps> = {}): CodeLoopDeps {
       }
       return {
         passed: true,
-        sScore: 1,
+        sScore: 1, stdout: "", stderr: "",
         tests_passed: [
           { name: "a", passed: true },
           { name: "b", passed: true },
@@ -130,7 +130,7 @@ describe("filter gate — weak pass ⇒ too_easy", () => {
       // weak code passes the tests: no learning signal
       runTests: async () => ({
         passed: true,
-        sScore: 1,
+        sScore: 1, stdout: "", stderr: "",
         tests_passed: [
           { name: "a", passed: true },
           { name: "b", passed: true },
@@ -157,13 +157,13 @@ describe("utility gate — commit boundary at τ", () => {
         if (code === "WEAK")
           return {
             passed: false,
-            sScore: 0.5,
+            sScore: 0.5, stdout: "", stderr: "",
             tests_passed: [{ name: "a", passed: true }],
             tests_failed: [{ name: "b", passed: false, message: "fail" }],
           };
         return {
           passed: true,
-          sScore: 1,
+          sScore: 1, stdout: "", stderr: "",
           tests_passed: [
             { name: "a", passed: true },
             { name: "b", passed: true },
@@ -186,13 +186,13 @@ describe("utility gate — commit boundary at τ", () => {
         if (code === "WEAK")
           return {
             passed: false,
-            sScore: 0.5,
+            sScore: 0.5, stdout: "", stderr: "",
             tests_passed: [{ name: "a", passed: true }],
             tests_failed: [{ name: "b", passed: false, message: "fail" }],
           };
         return {
           passed: true,
-          sScore: 1,
+          sScore: 1, stdout: "", stderr: "",
           tests_passed: [
             { name: "a", passed: true },
             { name: "b", passed: true },
@@ -247,7 +247,7 @@ describe("recipe mutation cadence", () => {
         if (code === "WEAK")
           return {
             passed: false,
-            sScore: 0,
+            sScore: 0, stdout: "", stderr: "",
             tests_passed: [],
             tests_failed: [
               {
@@ -259,7 +259,7 @@ describe("recipe mutation cadence", () => {
           };
         return {
           passed: true,
-          sScore: 1,
+          sScore: 1, stdout: "", stderr: "",
           tests_passed: [
             { name: "a", passed: true },
             { name: "b", passed: true },
@@ -335,7 +335,7 @@ describe("Prime training handoff", () => {
     const deps = makeDeps({
       runTests: async () => ({
         passed: true,
-        sScore: 1,
+        sScore: 1, stdout: "", stderr: "",
         tests_passed: [{ name: "a", passed: true }],
         tests_failed: [],
       }),
@@ -379,7 +379,7 @@ describe("strong fix that fails re-run is discarded", () => {
       runTests: async () => ({
         // both weak and strong fail the tests
         passed: false,
-        sScore: 0,
+        sScore: 0, stdout: "", stderr: "",
         tests_passed: [],
         tests_failed: [
           { name: "test_overflow", passed: false, message: "overflow" },

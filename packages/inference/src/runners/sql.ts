@@ -61,9 +61,9 @@ function rowsFromDb(db: Database, sql: string): Record<string, unknown>[] {
   const results = db.exec(sql);
   if (!results.length) return [];
   const { columns, values } = results[0];
-  return values.map((row) => {
+  return values.map((row: unknown[]) => {
     const obj: Record<string, unknown> = {};
-    columns.forEach((col, i) => {
+    columns.forEach((col: string, i: number) => {
       obj[col] = row[i];
     });
     return obj;

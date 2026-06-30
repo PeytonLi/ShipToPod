@@ -1,7 +1,8 @@
 import type { CodeTask, GenerationConfig } from "@shiptopod/core";
 import { randomUUID } from "node:crypto";
 import { loadBenchmarkTasks } from "./loader";
-import { deepseekChat, CHALLENGER_SYSTEM } from "../deepseek";
+import { deepseekChat } from "../deepseek";
+import { CHALLENGER_SYSTEM } from "../prompts";
 import { CodeTaskSchema } from "@shiptopod/core";
 
 /**

@@ -4,6 +4,7 @@ import {
   type AgentEvent,
   type CodeTask,
   type GenerationConfig,
+  type RunResult,
   type TestFailure,
   type TrainingPair,
 } from "@shiptopod/core";
@@ -28,7 +29,7 @@ export interface CodeLoopDeps {
   runTests: (
     task: CodeTask,
     code: string,
-  ) => Promise<{ passed: boolean; sScore: number }>;
+  ) => Promise<RunResult & { sScore: number }>;
   embed: (text: string) => Promise<number[]>;
   synthesizeRecipe: (
     recent: TrainingPair[],
@@ -218,7 +219,7 @@ export function defaultDeps(): CodeLoopDeps {
     runTests: async (task, code) => {
       const runner = getRunner(task.language);
       const result = await runner.run(task, code);
-      return { passed: result.passed, sScore: scoreRun(result) };
+      return { ...result, sScore: scoreRun(result) };
     },
     embed,
     synthesizeRecipe: async (recent) => {

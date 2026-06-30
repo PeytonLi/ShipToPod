@@ -28,23 +28,22 @@ describe("expandIntent", () => {
   it("maps intent to a partial GenerationConfig + sample titles", async () => {
     mockGenerate(
       JSON.stringify({
-        domain_framing: "React responsive grids",
-        framework: "react",
+        domain_framing: "Python algorithm and data structure tasks",
         challenger_weights: {
-          "responsive-card-grid": 3,
-          "modal-focus-trap": 2,
+          "python-list-comp": 3,
+          "python-recursion": 2,
         },
-        focus_mechanism: null,
-        sample_titles: ["Pricing grid", "Photo wall"],
+        focus_language: "python",
+        sample_titles: ["Prime number checker", "Fibonacci generator"],
       }),
     );
-    const r = await expandIntent("I want a model good at react", {
+    const r = await expandIntent("I want a model good at python", {
       sleep: noSleep,
     });
-    expect(r.config.intent).toBe("I want a model good at react");
-    expect(r.config.framework).toBe("react");
+    expect(r.config.intent).toBe("I want a model good at python");
+    expect(r.config.focus_language).toBe("python");
     expect(r.config.challenger_weights).toMatchObject({
-      "responsive-card-grid": 3,
+      "python-list-comp": 3,
     });
     expect(r.sample_titles).toHaveLength(2);
   });
