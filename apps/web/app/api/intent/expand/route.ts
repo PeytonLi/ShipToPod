@@ -12,22 +12,45 @@ interface ExpandResult {
 }
 
 function demoExpand(intent: string): ExpandResult {
+  const lower = intent.toLowerCase();
+  const isSql = lower.includes("sql");
+  const isPython = lower.includes("python") || lower.includes("py");
+
+  const focus_language = isSql ? "sql" : isPython ? "python" : null;
+  const domain = isSql
+    ? "SQL query writing and database manipulation tasks"
+    : isPython
+      ? "Python algorithm and data structure tasks"
+      : `Backend coding tasks aligned to: ${intent}`;
+
+  const weights: Record<string, number> = isSql
+    ? { "sql-joins": 3, "sql-aggregation": 2, "sql-subqueries": 2 }
+    : isPython
+      ? { "python-list-comp": 3, "python-recursion": 2, "python-dicts": 2 }
+      : { python: 2, sql: 2 };
+
+  const titles = isSql
+    ? [
+        "Find employees above average salary",
+        "Second highest order amount",
+        "Duplicate email detection",
+      ]
+    : isPython
+      ? [
+          "Prime number checker",
+          "Fibonacci sequence generator",
+          "String reversal",
+        ]
+      : ["Prime number checker", "SQL join query", "List comprehension task"];
+
   return {
     config: {
       intent,
-      domain_framing: `Front-end UI tasks aligned to: ${intent}`,
-      focus_language: null,
-      challenger_weights: {
-        "responsive-card-grid": 3,
-        "modal-focus-trap": 2,
-        "long-text-truncation": 2,
-      },
+      domain_framing: domain,
+      focus_language,
+      challenger_weights: weights,
     },
-    sample_titles: [
-      "Responsive pricing grid",
-      "Accessible modal dialog",
-      "Truncated card titles",
-    ],
+    sample_titles: titles,
   };
 }
 

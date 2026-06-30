@@ -1,1 +1,0 @@
-import{writeFileSync as w}from"fs";const c=process.argv[1];w("scripts/sql-finetune.ts",c,"utf-8");console.log("Written",c.length,"bytes")
