@@ -55,11 +55,13 @@ async function fetchPage(apiKey: string, url: string): Promise<string> {
       Authorization: "Bearer " + apiKey,
     },
     body: JSON.stringify({ zone: zone, url: url, format: "raw" }),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(45_000),
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error("Bright Data returned " + res.status + ": " + text.slice(0, 200));
+    throw new Error(
+      "Bright Data returned " + res.status + ": " + text.slice(0, 200),
+    );
   }
   return res.text();
 }
@@ -68,14 +70,25 @@ function extractTasks(
   html: string,
   languages: string[],
 ): Array<{ prompt: string; language: string; hidden_tests: string }> {
-  const tasks: Array<{ prompt: string; language: string; hidden_tests: string }> = [];
+  const tasks: Array<{
+    prompt: string;
+    language: string;
+    hidden_tests: string;
+  }> = [];
 
-  const descMatches = html.match(/data-track-load="description_content"[^>]*>([\s\S]*?)<\/div>/gi);
+  const descMatches = html.match(
+    /data-track-load="description_content"[^>]*>([\s\S]*?)<\/div>/gi,
+  );
   for (const match of descMatches ?? []) {
-    const text = match.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const text = match
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (text.length < 50) continue;
 
-    const isSql = /sql|select |table|query/i.test(text) && !/python|def |class /i.test(text);
+    const isSql =
+      /sql|select |table|query/i.test(text) &&
+      !/python|def |class /i.test(text);
     const lang = isSql ? "sql" : "python";
     if (!languages.includes(lang)) continue;
 
@@ -86,7 +99,9 @@ function extractTasks(
     });
   }
 
-  const qaMatches = html.match(/<a[^>]*class="[^"]*question-hyperlink[^"]*"[^>]*>([^<]+)<\/a>/gi);
+  const qaMatches = html.match(
+    /<a[^>]*class="[^"]*question-hyperlink[^"]*"[^>]*>([^<]+)<\/a>/gi,
+  );
   for (const qaMatch of qaMatches ?? []) {
     const title = qaMatch.replace(/<[^>]*>/g, "").trim();
     if (title.length < 10) continue;
@@ -108,13 +123,19 @@ function parseCodeTasks(raw: unknown[]): CodeTask[] {
   const tasks: CodeTask[] = [];
   for (let i = 0; i < raw.length; i++) {
     const item = raw[i] as Record<string, unknown> | null;
-    if (!item || typeof item.prompt !== "string" || typeof item.language !== "string") continue;
+    if (
+      !item ||
+      typeof item.prompt !== "string" ||
+      typeof item.language !== "string"
+    )
+      continue;
 
     const candidate = {
       id: "brightdata-" + i,
       prompt: item.prompt,
       language: item.language,
-      hidden_tests: typeof item.hidden_tests === "string" ? item.hidden_tests : "",
+      hidden_tests:
+        typeof item.hidden_tests === "string" ? item.hidden_tests : "",
       source: "brightdata",
     };
     const parsed = CodeTaskSchema.safeParse(candidate);

@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@shiptopod/core": "workspace:*",
-    "better-sqlite3": "^11.0.0"
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@types/node": "^22",
