@@ -134,22 +134,22 @@ function FlowNodeCard({
         className={`relative rounded-xl border ${node.border} bg-[#0a0b0e] p-4 transition-all duration-200 hover:border-white/[0.15] hover:bg-[#0d0e12]`}
       >
         {/* Step number badge */}
-        <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-white/[0.1] bg-[#0a0b0e] font-mono text-[10px] text-zinc-500">
+        <span className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full border border-white/[0.1] bg-[#0a0b0e] font-mono text-xs text-zinc-400">
           {node.step}
         </span>
 
         {/* Icon + label */}
-        <div className="mb-2 flex items-center gap-2.5">
+        <div className="mb-3 flex items-center gap-3">
           <span
-            className={`flex size-7 shrink-0 items-center justify-center rounded-md border ${node.iconBg}`}
+            className={`flex size-9 shrink-0 items-center justify-center rounded-md border ${node.iconBg}`}
           >
-            <node.icon className={`size-3 ${node.color}`} />
+            <node.icon className={`size-4 ${node.color}`} />
           </span>
-          <span className="text-xs font-medium text-white">{node.label}</span>
+          <span className="text-sm font-semibold text-white">{node.label}</span>
         </div>
 
         {/* Description */}
-        <p className="text-[11px] leading-relaxed text-zinc-500">{node.desc}</p>
+        <p className="text-sm leading-relaxed text-zinc-400">{node.desc}</p>
       </div>
 
       {/* Right arrow (between columns) */}
@@ -178,21 +178,21 @@ export default function FlowGraph() {
       {/* ── Data sources banner ──────────────────────────── */}
       <div className="mb-6 rounded-xl border border-white/[0.06] bg-[#0a0b0e] p-4">
         <div className="mb-3 flex items-center gap-2">
-          <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-600">
+          <span className="text-xs font-medium uppercase tracking-widest text-zinc-600">
             Where the tasks come from
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {/* Benchmarks */}
           <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-500/[0.04] p-3">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10">
-              <ScrollText className="size-3 text-blue-400" />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10">
+              <ScrollText className="size-4 text-blue-400" />
             </span>
             <div>
-              <span className="text-xs font-medium text-white">
+              <span className="text-sm font-semibold text-white">
                 Standard Benchmarks
               </span>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+              <p className="mt-0.5 text-sm leading-relaxed text-zinc-400">
                 Curated problem sets like MBPP, HumanEval, Spider, and WikiSQL.
                 Each task ships with hidden tests.
               </p>
@@ -201,14 +201,14 @@ export default function FlowGraph() {
 
           {/* Bright Data */}
           <div className="flex items-start gap-3 rounded-lg border border-orange-500/20 bg-orange-500/[0.04] p-3">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-orange-500/20 bg-orange-500/10">
-              <Globe className="size-3 text-orange-400" />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-orange-500/20 bg-orange-500/10">
+              <Globe className="size-4 text-orange-400" />
             </span>
             <div>
-              <span className="text-xs font-medium text-white">
+              <span className="text-sm font-semibold text-white">
                 Bright Data Scraping
               </span>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+              <p className="mt-0.5 text-sm leading-relaxed text-zinc-400">
                 Scrapes real-world coding problems from Stack Overflow,
                 competitive-programming sites, and open-source issue trackers.
                 Each scraped problem is converted into a testable task.
@@ -219,11 +219,11 @@ export default function FlowGraph() {
 
         {/* Merging arrow */}
         <div className="mt-3 flex items-center justify-center gap-2">
-          <Plus className="size-3 text-zinc-600" />
-          <span className="text-[10px] text-zinc-600">
+          <Plus className="size-4 text-zinc-600" />
+          <span className="text-sm text-zinc-500">
             Both sources feed into the same pipeline
           </span>
-          <ArrowDown className="size-3 text-zinc-600" />
+          <ArrowDown className="size-4 text-zinc-600" />
         </div>
       </div>
 
@@ -250,7 +250,7 @@ export default function FlowGraph() {
       {/* ── Loop-back indicator ─────────────────────────────── */}
       <div className="mt-6 flex items-center justify-center gap-3 rounded-lg border border-dashed border-white/[0.06] py-2.5">
         <svg
-          className="size-3.5 text-zinc-600"
+          className="size-4.5 text-zinc-600"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -262,7 +262,7 @@ export default function FlowGraph() {
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
           />
         </svg>
-        <span className="text-[11px] text-zinc-600">
+        <span className="text-sm text-zinc-600">
           After evaluation, the cycle repeats — continuously improving
         </span>
       </div>
