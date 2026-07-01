@@ -59,11 +59,19 @@ export function ModelReadyPanel() {
       </div>
       {evalReport ? (
         <div className="mt-3 text-sm text-zinc-200">
-          Tuned vs base:{" "}
-          <span className="text-emerald-400">{evalReport.wins}W</span> /{" "}
-          {evalReport.ties}T /{" "}
-          <span className="text-rose-400">{evalReport.losses}L</span> · Δscore{" "}
-          {evalReport.mean_score_delta.toFixed(3)}
+          Base pass@1{" "}
+          <span className="font-mono">
+            {(evalReport.base_pass_at_1 * 100).toFixed(1)}%
+          </span>{" "}
+          · Tuned pass@1{" "}
+          <span className="font-mono text-emerald-400">
+            {(evalReport.tuned_pass_at_1 * 100).toFixed(1)}%
+          </span>{" "}
+          · Δ{" "}
+          <span className="font-mono">
+            {evalReport.delta >= 0 ? "+" : ""}
+            {(evalReport.delta * 100).toFixed(1)}%
+          </span>
         </div>
       ) : null}
       <div className="mt-4">

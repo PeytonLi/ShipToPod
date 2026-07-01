@@ -774,17 +774,18 @@ export function ControlCenter() {
               </Button>
               {snapshot.evalReport && (
                 <span className="text-xs text-zinc-300">
-                  Tuned vs base:{" "}
-                  <span className="text-emerald-400">
-                    {snapshot.evalReport.wins}W
-                  </span>{" "}
-                  / {snapshot.evalReport.ties}T /{" "}
-                  <span className="text-rose-400">
-                    {snapshot.evalReport.losses}L
-                  </span>{" "}
-                  · Δscore{" "}
+                  Base pass@1{" "}
                   <span className="font-mono">
-                    {snapshot.evalReport.mean_score_delta.toFixed(3)}
+                    {(snapshot.evalReport.base_pass_at_1 * 100).toFixed(1)}%
+                  </span>{" "}
+                  · Tuned pass@1{" "}
+                  <span className="font-mono text-emerald-400">
+                    {(snapshot.evalReport.tuned_pass_at_1 * 100).toFixed(1)}%
+                  </span>{" "}
+                  · Δ{" "}
+                  <span className="font-mono">
+                    {snapshot.evalReport.delta >= 0 ? "+" : ""}
+                    {(snapshot.evalReport.delta * 100).toFixed(1)}%
                   </span>
                 </span>
               )}
