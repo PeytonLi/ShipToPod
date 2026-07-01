@@ -308,7 +308,7 @@ export default function TrainingPage() {
                 ["GPU", "L40S 48GB (RunPod)"],
                 ["Duration", "~45 min"],
                 ["Cost", "$0.98"],
-                ["Adapter", "shiptopod-sql-lora"],
+                ["Adapter", "shiptopod-sql-lora-20260630-160040-v3"],
               ].map(([l, v]: string[]) =>
                 React.createElement(
                   "div",
@@ -332,7 +332,7 @@ export default function TrainingPage() {
             React.createElement(
               "a",
               {
-                href: "https://huggingface.co/peytonali/deepseek-coder-bbb-lora",
+                href: "https://huggingface.co/peytonali/shiptopod-sql-lora-20260630-160040-v3",
                 target: "_blank",
                 rel: "noopener noreferrer",
                 className:
