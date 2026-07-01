@@ -14,20 +14,36 @@ The reward signal is objective: generated code either passes its tests or it doe
 
 ## How it works
 
-```
-benchmark task ──► student (small DeepSeek-Coder) drafts code
-        │
-   RUN TESTS ──► must FAIL   (no failure = no learning signal, discard)
-        │
-   teacher (DeepSeek) writes the fix
-        │
-   RUN TESTS ──► must PASS
-        │
-   utility gate (𝒰 ≥ τ) + diversity gate
-        │
-   commit verified break-and-fix pair
-        │  (at batch size)
-   chat JSONL ──► Prime LoRA ──► new Hugging Face repo ──► held-out pass@1 eval
+```mermaid
+flowchart TD
+    A["📋 Benchmark Task<br/>(SQL or Python)"] --> B["🧑‍💻 Student Model<br/>(small DeepSeek-Coder)"]
+    B --> C{"🔬 Run Tests"}
+    C -->|"❌ FAILS"| D["🧠 Teacher Model<br/>(DeepSeek reasoner)"]
+    C -->|"✅ PASSES"| R1["🗑️ Discard<br/>too easy"]
+    D --> E["✍️ Write Fix"]
+    E --> F{"🔬 Run Tests"}
+    F -->|"✅ PASSES"| G{"📊 Utility Gate<br/>𝒰 ≥ τ ?"}
+    F -->|"❌ FAILS"| R2["🗑️ Discard<br/>not fixed"]
+    G -->|"✅ YES"| H{"🔍 Diversity Gate<br/>not redundant?"}
+    G -->|"❌ NO"| R3["🗑️ Discard<br/>low signal"]
+    H -->|"✅ YES"| I["✅ Commit Pair"]
+    H -->|"❌ NO"| R4["🗑️ Discard<br/>redundant"]
+    I --> J["📦 Collect Batch<br/>(30+ pairs)"]
+    J --> K["💾 Export JSONL"]
+    K --> L["🚀 LoRA Training<br/>(RunPod GPU)"]
+    L --> M["☁️ Push to HuggingFace"]
+    M --> N["📈 Eval: base vs tuned<br/>held-out pass@1"]
+
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style D fill:#1a1a2e,stroke:#533483,color:#fff
+    style I fill:#1a1a2e,stroke:#16c79a,color:#fff
+    style L fill:#1a1a2e,stroke:#e94560,color:#fff
+    style N fill:#1a1a2e,stroke:#16c79a,color:#fff
+    style R1 fill:#1a1a2e,stroke:#666,color:#999
+    style R2 fill:#1a1a2e,stroke:#666,color:#999
+    style R3 fill:#1a1a2e,stroke:#666,color:#999
+    style R4 fill:#1a1a2e,stroke:#666,color:#999
 ```
 
 ---
